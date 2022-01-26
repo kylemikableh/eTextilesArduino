@@ -19,16 +19,35 @@ cLEDMatrix<MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_TYPE> leds;
 void setup() {
   // put your setup code here, to run once:
 
-  strip.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
-  strip.show();            // Turn OFF all pixels ASAP
-  strip.setBrightness(50); // Set BRIGHTNESS to about 1/5 (max = 255)
-
 FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds[0], leds.Size());
 
   // put your main code here, to run repeatedly:
   FastLED.clear();
-  leds[0] = CRGB::Purple; FastLED.show(); delay(30);
-  //leds(1, 1) = CHSV(255, 255, 255);
+
+//Bar
+//  for(int i = 0; i < MATRIX_WIDTH; i++) {
+//    for(int j = 0; j < 4; j++) {
+//      leds(i, j) = CHSV(150, 255, 50);
+//    }
+//  }
+
+//Full
+
+//  for(int i = 0; i < MATRIX_WIDTH; i++) {
+//    for(int j = 0; j < MATRIX_HEIGHT; j++) {
+//      leds(i, j) = CHSV(150, 255, 50);
+//    }
+//  }
+
+//Diagonal
+
+  for(int i = 0; i < MATRIX_WIDTH; i++) {
+    for(int j = 0; j < i; j++) {
+      leds(i, j) = CHSV(150, 255, 50);
+    }
+  }
+
+  
   FastLED.show();
 }
 
