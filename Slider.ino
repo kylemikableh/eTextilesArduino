@@ -17,8 +17,6 @@ Arduino 1.6.7
 ******************************************************************************/
 const int SOFT_POT_PIN = A0; // Pin connected to softpot wiper
 
-const int GRAPH_LENGTH = 40; // Length of line graph
-
 void setup() 
 {
   Serial.begin(9600);
@@ -29,7 +27,7 @@ void loop()
 {
   // Read in the soft pot's ADC value
   int softPotADC = analogRead(SOFT_POT_PIN);
-  // Map the 0-1023 value to 0-40
+  // Map the 0-1023 value to 0-255
   int softPotPosition = map(softPotADC, 0, 1023, 0, 255);
 
 Serial.println(String(softPotPosition));
