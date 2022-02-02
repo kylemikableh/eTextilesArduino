@@ -15,6 +15,7 @@ WebUSB WebUSBSerial(1 /* http:// */, "localhost:4000/controller/");
 #define NULL_STRING "null" //String of null JSON might return
 #define START_TRANSMISSION_CHAR "#"
 #define END_TRANSMISSION_CHAR "$"
+#define LOWEST_SLIDER_VALUE 50 //Lowest value threshold for Slider values
 
 /**
  * Action types
@@ -28,6 +29,7 @@ WebUSB WebUSBSerial(1 /* http:// */, "localhost:4000/controller/");
 #define ACTION_ID_BUTTON "B"
 #define ACTION_ID_TILE "T"
 #define ACTION_ID_SLIDER "S"
+#define ACTION_TYPE "type"
 
 /**
  * Update types
@@ -36,6 +38,13 @@ WebUSB WebUSBSerial(1 /* http:// */, "localhost:4000/controller/");
 #define UPDATE_LEDS "LEDS"
 #define UPDATE_LEDS_VALUES "values"
 
+/**
+ * Define slider information
+ */
+
+#define SOFT_POT_PIN_1 A0 // Pin connected to softpot wiper
+#define SOFT_POT_PIN_2 A1 // Pin connected to softpot wiper
+
 String active_tile;
 
 /**
@@ -43,6 +52,7 @@ String active_tile;
  */
 void setup() 
 {
+  initalizePins();
   while (!Serial) {;} // Don't do anything unless Serial is active
   
   Serial.begin(115200);
@@ -50,6 +60,14 @@ void setup()
   Serial.flush();
   active_tile = "NONE";
 }
+
+/**
+ * Initalize pins for use
+ */
+ void initalizePins()
+ {
+  pinMode(SOFT_POT_PIN_1, INPUT);
+ }
 
 /**
  * Get the sent JSON from the site and convert it to JSON type
@@ -157,12 +175,40 @@ void checkForButtonPress()
   
 }
 
+void writeSliderInfo(char *type, int value)
+{
+  const int capacity = JSON_OBJECT_SIZE(6);
+  StaticJsonDocument<capacity> doc;
+  doc[ACTION] = ACTION_SLIDER_MOVED;
+  doc[ACTION_ID] = value;
+  doc[ACTION_TYPE] = String(type);
+  String output;
+  serializeJson(doc, output);
+  sendToSite(output);
+}
+
 /**
- * See if the slider has moved, if so report back to site
+ * See if the sliders has moved, if so report back to site
  */
 void checkForSlider()
 {
-  
+  // Read in the soft pot's ADC value
+  int softPotADC1 = analogRead(SOFT_POT_PIN_1);
+  // Map the 0-1023 value to 0-255
+  int softPotPosition1 = map(softPotADC1, 0, 1023, 0, 255);
+
+  // Read in the soft pot's ADC value
+  int softPotADC2 = analogRead(SOFT_POT_PIN_2);
+  // Map the 0-1023 value to 0-255
+  int softPotPosition2 = map(softPotADC2, 0, 1023, 0, 255);
+  if(softPotPosition1 != NULL && softPotPosition1 >= LOWEST_SLIDER_VALUE) //If it is not zero do something
+  {
+    writeSliderInfo("S0", softPotPosition1);
+  }
+  if(softPotPosition2 != NULL && softPotPosition2 >= LOWEST_SLIDER_VALUE) //If it is not zero do something
+  {
+    writeSliderInfo("S1", softPotPosition2);
+  }
 }
 
 /**
