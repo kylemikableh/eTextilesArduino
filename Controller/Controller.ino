@@ -34,7 +34,9 @@ WebUSB WebUSBSerial(1 /* http:// */, "localhost:4000/controller/");
  */
 #define UPDATE "update"
 #define UPDATE_LEDS "LEDS"
+#define UPDATE_LEDS_VALUES "values"
 
+String active_tile;
 
 /**
  * Arduino setup function on powerup.
@@ -44,8 +46,9 @@ void setup()
   while (!Serial) {;} // Don't do anything unless Serial is active
   
   Serial.begin(115200);
-  if(DEBUG) {sendToSite("Controller Paired.");}
+  if(DEBUG) {sendToSite("{\"message\": \"Controller Paired.\"}");}
   Serial.flush();
+  active_tile = "NONE";
 }
 
 /**
@@ -56,7 +59,10 @@ void setup()
 DynamicJsonDocument getJsonFromSite() 
 {
   String jsonRecieved = Serial.readString();
-  if(DEBUG) {sendToSite(jsonRecieved);}
+  if(DEBUG) 
+  {
+    sendToSite(jsonRecieved);
+  }
   
   DynamicJsonDocument json(1024);
   deserializeJson(json, jsonRecieved);
@@ -77,6 +83,15 @@ void sendToSite(String data)
 }
 
 /**
+ * LED Controller
+ */
+ void changeLEDS(DynamicJsonDocument json)
+ {
+    String values = json[UPDATE_LEDS_VALUES];
+    sendToSite(values); //We parrot what we got
+ }
+
+/**
  * Process update sent to controller
  */
 void processUpdate(DynamicJsonDocument json)
@@ -88,6 +103,7 @@ void processUpdate(DynamicJsonDocument json)
   else if (update.equalsIgnoreCase(UPDATE_LEDS)) 
   {
     //Handle LED update
+    changeLEDS(json);
   }
   else
   {
@@ -127,10 +143,53 @@ void serialAvailable()
     DynamicJsonDocument json = getJsonFromSite(); // Let's get the sent JSON
     
     processAction(json);
-    
-    String kyle = json["kyle"];
+    processUpdate(json);
     Serial.flush();
   }
+  checkForAnyUserInput();
+}
+
+/**
+ * Check for all buttons to be pressed and send this to controller
+ */
+void checkForButtonPress()
+{
+  
+}
+
+/**
+ * See if the slider has moved, if so report back to site
+ */
+void checkForSlider()
+{
+  
+}
+
+/**
+ * See if a tile was removed, if so store this information and report
+ */
+void checkForTileRemoval()
+{
+  
+}
+
+/**
+ * See if a tile was placed, if so act accordingly
+ */
+void checkForTilePlacement()
+{
+  
+}
+
+/**
+ * Check for all user inputs on the controller
+ */
+void checkForAnyUserInput()
+{
+  checkForButtonPress();
+  checkForSlider();
+  checkForTileRemoval();
+  checkForTilePlacement();
 }
 
 /**
