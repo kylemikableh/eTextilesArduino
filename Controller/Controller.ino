@@ -45,7 +45,8 @@ WebUSB WebUSBSerial(1 /* http:// */, "localhost:4000/controller/");
 #define SOFT_POT_PIN_1 A0 // Pin connected to softpot wiper
 #define SOFT_POT_PIN_2 A1 // Pin connected to softpot wiper
 
-String active_tile;
+String activeTile;
+int activePallet; //0-5 for the palette squares
 
 /**
  * Arduino setup function on powerup.
@@ -58,7 +59,11 @@ void setup()
   Serial.begin(115200);
   if(DEBUG) {sendToSite("{\"message\": \"Controller Paired.\"}");}
   Serial.flush();
-  active_tile = "NONE";
+  activeTile = "NONE";
+  activePallet = 0; // Let's initalize the top left palette
+                    // 10
+                    // 00
+                    // 00
 }
 
 /**
@@ -172,7 +177,19 @@ void serialAvailable()
  */
 void checkForButtonPress()
 {
-  
+  //figure out which button is pressed
+  bool changeDetected = true;
+  if(changeDetected) 
+  {
+    const int capacity = JSON_OBJECT_SIZE(6);
+    StaticJsonDocument<capacity> doc;
+    doc[ACTION] = ACTION_BUTTON_PRESSED;
+    doc[ACTION_ID] = buttonID;
+    String output;
+    serializeJson(doc, output);
+    sendToSite(output);
+    delay(200); //Remove for testing only
+   }
 }
 
 void writeSliderInfo(char *type, int value)
@@ -228,11 +245,35 @@ void checkForTilePlacement()
 }
 
 /**
+ * See if a palette change
+ */
+void checkForPaletteChange()
+{
+  //Do the checking here, check with teammates, button 0-5 is the palette buttons
+  bool changeDetected = true;
+  if(changeDetected) 
+  {
+    int buttonID = 0; //Set this to button ID detected
+    activePallet = buttonID;
+    const int capacity = JSON_OBJECT_SIZE(6);
+    StaticJsonDocument<capacity> doc;
+    doc[ACTION] = ACTION_BUTTON_PRESSED;
+    doc[ACTION_ID] = buttonID;
+    String output;
+    serializeJson(doc, output);
+    sendToSite(output);
+    delay(200); //Remove for testing only
+   }
+}
+
+
+/**
  * Check for all user inputs on the controller
  */
 void checkForAnyUserInput()
 {
   checkForButtonPress();
+  checkForPaletteChange();
   checkForSlider();
   checkForTileRemoval();
   checkForTilePlacement();
