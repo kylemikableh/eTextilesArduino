@@ -1,6 +1,6 @@
 /** DO NOT REMOVE OR BREAK ME */
 #include <WebUSB.h>
-WebUSB WebUSBSerial(1 /* http:// */, "localhost:4000/controller/");
+WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 #define Serial WebUSBSerial
 /** DO NOT REMOVE OR BREAK ME */
 
@@ -46,7 +46,6 @@ WebUSB WebUSBSerial(1 /* http:// */, "localhost:4000/controller/");
 #define SOFT_POT_PIN_2 A1 // Pin connected to softpot wiper
 
 String activeTile;
-int activePallet; //0-5 for the palette squares
 
 /**
  * Arduino setup function on powerup.
@@ -60,10 +59,6 @@ void setup()
   if(DEBUG) {sendToSite("{\"message\": \"Controller Paired.\"}");}
   Serial.flush();
   activeTile = "NONE";
-  activePallet = 0; // Let's initalize the top left palette
-                    // 10
-                    // 00
-                    // 00
 }
 
 /**
@@ -178,7 +173,7 @@ void serialAvailable()
 void checkForButtonPress()
 {
   //figure out which button is pressed
-  bool changeDetected = true;
+  bool changeDetected = false;
   
   if(changeDetected) 
   {
@@ -215,26 +210,26 @@ void checkForSlider()
   // Read in the soft pot's ADC value
   int softPotADC1 = analogRead(SOFT_POT_PIN_1);
   // Map the 0-1023 value to 0-365
-  int softPotPosition1 = map(softPotADC1, 0, 1023, 0, 365);
+  int softPotPosition1 = map(softPotADC1, 0, 1023, 1, 365);
 
   // Read in the soft pot's ADC value
   int softPotADC2 = analogRead(SOFT_POT_PIN_2);
   // Map the 0-1023 value to 0-255
-  int softPotPosition2 = map(softPotADC2, 0, 1023, 0, 365);
+  int softPotPosition2 = map(softPotADC2, 0, 1023, 1, 365);
   if(softPotPosition1 != NULL && softPotPosition1 >= LOWEST_SLIDER_VALUE) //If it is not zero do something
   {
     writeSliderInfo("S0", softPotPosition1);
   }
-  if(softPotPosition2 != NULL && softPotPosition2 >= LOWEST_SLIDER_VALUE) //If it is not zero do something
-  {
-    writeSliderInfo("S1", softPotPosition2);
-  }
+//  if(softPotPosition2 != NULL && softPotPosition2 >= LOWEST_SLIDER_VALUE) //If it is not zero do something
+//  {
+//    writeSliderInfo("S1", softPotPosition2);
+//  }
   //For demonstration purposes
-  for(int i = 0; i < 355; i++) 
-  {
-    writeSliderInfo("S1", i);
-    delay(100);
-  }
+//  for(int i = 0; i < 355; i++) 
+//  {
+//    writeSliderInfo("S1", i);
+//    delay(100);
+//  }
 }
 
 /**
@@ -259,11 +254,10 @@ void checkForTilePlacement()
 void checkForPaletteChange()
 {
   //Do the checking here, check with teammates, button 0-5 is the palette buttons
-  bool changeDetected = true;
+  bool changeDetected = false;
   if(changeDetected) 
   {
     int buttonID = 0; //Set this to button ID detected
-    activePallet = buttonID;
     const int capacity = JSON_OBJECT_SIZE(6);
     StaticJsonDocument<capacity> doc;
     doc[ACTION] = ACTION_BUTTON_PRESSED;
