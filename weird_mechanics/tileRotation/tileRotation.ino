@@ -1,19 +1,20 @@
 #include <stdint.h>
 
-uint_8t [2] tile_orientation;
+uint8_t tile_orientation [2];
 
 int tile_sel_left;
 int tile_sel_right;
 int tile_sel_hor;
 int tile_sel_vir;
 
-int tile_out_pin_1;
-int tile_out_pin_2;
+int tile_out_pin;
 
 int grid_ne_pin;
 int grid_nw_pin;
 int grid_se_pin;
 int grid_sw_pin;
+
+const unsigned long event_1 = 1000;
 
 bool determine_orientation = false;
 
@@ -21,7 +22,7 @@ void setup()
 {
   //=== ATTACH INTERRUPT TO CHECK TILE ORIENTATION EVERY SO OFTEN
   // generate a 'TIMER0_COMPA' interrupt whenever the counter value passes 0xAF
-  OCR0A = 0xAF;
+  OCR0A = 0xFA;
   TIMSK0 |= _BV(OCIE0A);  
 }
 
@@ -91,18 +92,23 @@ void status(int quadrant, int tile_orientation){
 void loop() 
 {
   if(determine_orientation){
-
+        
     for(int quadrant = 0; quadrant < 4; quadrant++){
-        for(int tile = 0; tile < 4; tile ++){
+        int tile_orientation;
+        bool unfinished = true;
+        for(int tile = 0; tile < 4; tile++){
+          if ( millis() > event_1  && unfinished) {
           grid_space_read(quadrant);          
-          int tile_orientation = tile_read(0,0);
-          status(int quadrant, int tile_orientation);
-          int tile_orientation = tile_read(0,1);
-          status(int quadrant, int tile_orientation);
-          int tile_orientation = tile_read(1,0);
-          status(int quadrant, int tile_orientation);
-          int tile_orientation = tile_read(1,1);
-          status(int quadrant, int tile_orientation);
+           tile_orientation = tile_read(0,0);
+          status( quadrant,  tile_orientation);
+           tile_orientation = tile_read(0,1);
+          status( quadrant,  tile_orientation);
+           tile_orientation = tile_read(1,0);
+          status( quadrant,  tile_orientation);
+           tile_orientation = tile_read(1,1);
+          status( quadrant,  tile_orientation);
+          unfinished = false;
+          }
         }
         quadrant ++;
       }
@@ -110,5 +116,3 @@ void loop()
     }
       determine_orientation= false;    
   }
-
-}
