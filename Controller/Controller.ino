@@ -179,8 +179,11 @@ void checkForButtonPress()
 {
   //figure out which button is pressed
   bool changeDetected = true;
+  
   if(changeDetected) 
   {
+    //This is for handling which page we are viewing
+    int buttonID = 0; //Set this to button ID detected
     const int capacity = JSON_OBJECT_SIZE(6);
     StaticJsonDocument<capacity> doc;
     doc[ACTION] = ACTION_BUTTON_PRESSED;
@@ -211,13 +214,13 @@ void checkForSlider()
 {
   // Read in the soft pot's ADC value
   int softPotADC1 = analogRead(SOFT_POT_PIN_1);
-  // Map the 0-1023 value to 0-255
-  int softPotPosition1 = map(softPotADC1, 0, 1023, 0, 255);
+  // Map the 0-1023 value to 0-365
+  int softPotPosition1 = map(softPotADC1, 0, 1023, 0, 365);
 
   // Read in the soft pot's ADC value
   int softPotADC2 = analogRead(SOFT_POT_PIN_2);
   // Map the 0-1023 value to 0-255
-  int softPotPosition2 = map(softPotADC2, 0, 1023, 0, 255);
+  int softPotPosition2 = map(softPotADC2, 0, 1023, 0, 365);
   if(softPotPosition1 != NULL && softPotPosition1 >= LOWEST_SLIDER_VALUE) //If it is not zero do something
   {
     writeSliderInfo("S0", softPotPosition1);
@@ -225,6 +228,12 @@ void checkForSlider()
   if(softPotPosition2 != NULL && softPotPosition2 >= LOWEST_SLIDER_VALUE) //If it is not zero do something
   {
     writeSliderInfo("S1", softPotPosition2);
+  }
+  //For demonstration purposes
+  for(int i = 0; i < 355; i++) 
+  {
+    writeSliderInfo("S1", i);
+    delay(100);
   }
 }
 
