@@ -30,7 +30,7 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 #define NULL_STRING "null" //String of null JSON might return
 #define START_TRANSMISSION_CHAR "#"
 #define END_TRANSMISSION_CHAR "$"
-#define LOWEST_SLIDER_VALUE 50 //Lowest value threshold for Slider values
+#define LOWEST_SLIDER_VALUE 100 //Lowest value threshold for Slider values
 
 /**
  * Action types
@@ -56,6 +56,8 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 #define UPDATE_LEDS_STYLE_FULL "full"
 #define UPDATE_LEDS_STYLE_BAR "bar"
 #define UPDATE_LEDS_STYLE_DIAGONAL "diagonal"
+#define UPDATE_LEDS_FIRST_COLOR "first_color"
+#define UPDATE_LEDS_SECOND_COLOR "second_color"
 
 /**
  * Define slider information
@@ -97,13 +99,13 @@ void setupLEDS()
 
 /**
  * Send any data to site (Adds Start/end character to indicate start/end of a transmission)
- * @args data String data to send
+ * @args data char* data to send over serial
  */
 void sendToSite(char* data) 
 {
-  char* startChar = START_TRANSMISSION_CHAR;
-  char* endChar = END_TRANSMISSION_CHAR;
-  char* nullTerminator = "\0";
+  const char* startChar = START_TRANSMISSION_CHAR;
+  const char* endChar = END_TRANSMISSION_CHAR;
+  const char* nullTerminator = "\0";
   char* toSend = malloc(2 + CHAR_BUFFER_SIZE); //Allocate memory for new string. Size probably needs to change
   strcpy(toSend, startChar);
   strcat(toSend, data);
@@ -121,7 +123,9 @@ void sendToSite(char* data)
  {
     const char* values = json[UPDATE_LEDS_VALUES];
     const char* style = json[UPDATE_LEDS_STYLE]; 
-    
+    int firstColor = json[UPDATE_LEDS_FIRST_COLOR];
+    int secondColor = json[UPDATE_LEDS_SECOND_COLOR];
+    sendToSite(style);
     if(strcmp(style, UPDATE_LEDS_STYLE_BAR) == 0)
     {
       sendToSite("Style of BAR");
@@ -153,7 +157,11 @@ void sendToSite(char* data)
           leds(i, j) = CHSV(150, 255, 50);
         }
       }
-    }     
+    }
+    else
+    {
+      sendToSite("Type of LED update not given.");     
+    }
     FastLED.show();
  }
 
@@ -173,6 +181,8 @@ void processUpdate(DynamicJsonDocument json)
   }
   else
   {
+    sendToSite("Update not supported");
+    sendToSite(updateStr);
     //Update not supported
   }
 }
@@ -216,13 +226,13 @@ DynamicJsonDocument getJsonFromSite()
   }
   
   DynamicJsonDocument json(JSON_BUFFER_SIZE);
-//  String error = deserializeJson(json, jsonRecieved).c_str();
-  deserializeJson(json, jsonRecieved);
-//  if(error)//If deserializeJson failed, report this
-//  {
-//    sendToSite("{\"message\": \"Esin\"}");
-//    sendToSite(error);
-//  }
+  char* error = deserializeJson(json, jsonRecieved).c_str();
+//  deserializeJson(json, jsonRecieved);
+  if(error)//If deserializeJson failed, report this
+  {
+    sendToSite("{\"message\": \"deserialize error?\"}");
+    sendToSite(error);
+  }
   return json;
 }
 
@@ -247,7 +257,7 @@ void serialAvailable()
     }
     Serial.flush();
   }
-  //checkForAnyUserInput();
+  checkForAnyUserInput();
 }
 
 /**
@@ -261,15 +271,15 @@ void checkForButtonPress()
   if(changeDetected) 
   {
     //This is for handling which page we are viewing
-    int buttonID = 0; //Set this to button ID detected
+    char buttonID = 0; //Set this to button ID detected
     const int capacity = JSON_OBJECT_SIZE(6);
     StaticJsonDocument<capacity> doc;
     doc[ACTION] = ACTION_BUTTON_PRESSED;
     doc[ACTION_ID] = buttonID;
-    String output;
-    serializeJson(doc, output);
-    //sendToSite(output);
-    delay(200); //Remove for testing only
+    char* output = malloc(CHAR_BUFFER_SIZE);
+    serializeJson(doc, output, CHAR_BUFFER_SIZE);
+    sendToSite(output);
+    free(output);
    }
 }
 
@@ -279,10 +289,11 @@ void writeSliderInfo(char *type, int value)
   StaticJsonDocument<capacity> doc;
   doc[ACTION] = ACTION_SLIDER_MOVED;
   doc[ACTION_ID] = value;
-  doc[ACTION_TYPE] = String(type);
-  String output;
-  serializeJson(doc, output);
-  //sendToSite(output);
+  doc[ACTION_TYPE] = type;
+  char* output = malloc(CHAR_BUFFER_SIZE);
+  serializeJson(doc, output, CHAR_BUFFER_SIZE);
+  sendToSite(output);
+  free(output);
 }
 
 /**
@@ -340,15 +351,15 @@ void checkForPaletteChange()
   bool changeDetected = false;
   if(changeDetected) 
   {
-    int buttonID = 0; //Set this to button ID detected
+    char buttonID = 0; //Set this to button ID detected
     const int capacity = JSON_OBJECT_SIZE(6);
     StaticJsonDocument<capacity> doc;
     doc[ACTION] = ACTION_BUTTON_PRESSED;
     doc[ACTION_ID] = buttonID;
-    String output;
-    serializeJson(doc, output);
-    //sendToSite(output);
-    delay(200); //Remove for testing only
+    char* output = malloc(CHAR_BUFFER_SIZE);
+    serializeJson(doc, output, CHAR_BUFFER_SIZE);
+    sendToSite(output);
+    free(output);
    }
 }
 
