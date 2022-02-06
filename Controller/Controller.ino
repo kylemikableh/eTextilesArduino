@@ -25,7 +25,8 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
  */
 
 #define DEBUG true // Enable or disable debug operation
-#define JSON_BUFFER_SIZE 1024 // Size of JSON file in bytes
+#define JSON_BUFFER_SIZE 256 // Size of JSON file in bytes
+#define CHAR_BUFFER_SIZE 256 // Size of CHAR* allocations in bytes
 #define NULL_STRING "null" //String of null JSON might return
 #define START_TRANSMISSION_CHAR "#"
 #define END_TRANSMISSION_CHAR "$"
@@ -51,6 +52,10 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 #define UPDATE "update"
 #define UPDATE_LEDS "LEDS"
 #define UPDATE_LEDS_VALUES "values"
+#define UPDATE_LEDS_STYLE "style"
+#define UPDATE_LEDS_STYLE_FULL "full"
+#define UPDATE_LEDS_STYLE_BAR "bar"
+#define UPDATE_LEDS_STYLE_DIAGONAL "diagonal"
 
 /**
  * Define slider information
@@ -90,19 +95,6 @@ void setupLEDS()
   pinMode(SOFT_POT_PIN_1, INPUT);
  }
 
-///**
-// * Send any data to site (Adds Start/end character to indicate start/end of a transmission)
-// * @args data String data to send
-// */
-//void sendToSite(String data) 
-//{
-//  String toSend = START_TRANSMISSION_CHAR + data + END_TRANSMISSION_CHAR; // Start and end markers to help process the JSON on the controller (it recieves in chunks of data)
-//  char buff[JSON_BUFFER_SIZE];
-//  toSend.toCharArray(buff,JSON_BUFFER_SIZE);
-//  Serial.write(buff);
-//  Serial.flush();
-//}
-
 /**
  * Send any data to site (Adds Start/end character to indicate start/end of a transmission)
  * @args data String data to send
@@ -111,15 +103,15 @@ void sendToSite(char* data)
 {
   char* startChar = START_TRANSMISSION_CHAR;
   char* endChar = END_TRANSMISSION_CHAR;
-  char* delimit = "\0";
-  char* toSend = malloc(2 + JSON_BUFFER_SIZE);
+  char* nullTerminator = "\0";
+  char* toSend = malloc(2 + CHAR_BUFFER_SIZE); //Allocate memory for new string. Size probably needs to change
   strcpy(toSend, startChar);
   strcat(toSend, data);
   strcat(toSend, endChar);
-  strcat(toSend, delimit);
+  strcat(toSend, nullTerminator);
   Serial.write(toSend);
   Serial.flush();
-  free(toSend);
+  free(toSend); //Don't want no memory leaks!
 }
 
 /**
@@ -128,10 +120,11 @@ void sendToSite(char* data)
  void changeLEDS(DynamicJsonDocument json)
  {
     const char* values = json[UPDATE_LEDS_VALUES];
-    const char* style = "bar"; //Actually get these at some point
-
-    if(strcmp(style, "bar") == 0)
+    const char* style = json[UPDATE_LEDS_STYLE]; 
+    
+    if(strcmp(style, UPDATE_LEDS_STYLE_BAR) == 0)
     {
+      sendToSite("Style of BAR");
       for(int i = 0; i < MATRIX_WIDTH; i++) 
       {
         for(int j = 0; j < 4; j++) 
@@ -140,8 +133,9 @@ void sendToSite(char* data)
         }
       }
     }
-    else if(strcmp(style, "full") == 0)
+    else if(strcmp(style, UPDATE_LEDS_STYLE_FULL) == 0)
     {
+      sendToSite("Style of FULL");
       for(int i = 0; i < MATRIX_WIDTH; i++) 
       {
         for(int j = 0; j < MATRIX_HEIGHT; j++) 
@@ -151,8 +145,9 @@ void sendToSite(char* data)
       }
     }
     
-    else if(strcmp(style, "diagonal") == 0)
+    else if(strcmp(style, UPDATE_LEDS_STYLE_DIAGONAL) == 0)
     {
+      sendToSite("Style of DIAG");
       for(int i = 0; i < MATRIX_WIDTH; i++) {
         for(int j = 0; j < i; j++) {
           leds(i, j) = CHSV(150, 255, 50);
@@ -167,6 +162,7 @@ void sendToSite(char* data)
  */
 void processUpdate(DynamicJsonDocument json)
 {
+  sendToSite("Processing update");
   const char* updateStr = json[UPDATE];
   if(DEBUG){sendToSite(updateStr);}
   if(strcmp(updateStr,NULL_STRING) == 0) {return;}
@@ -239,10 +235,9 @@ void serialAvailable()
   {
     sendToSite("Made it here");
     DynamicJsonDocument json = getJsonFromSite(); // Let's get the sent JSON
-    sendToSite("Made i2 here");
     if(!json.isNull())
     {
-      sendToSite("Was not null.");
+      sendToSite("Was not null. Test char size: 1234556778991234456678899012344546547i5i8");
       processAction(json);
       processUpdate(json);
     }
@@ -250,7 +245,6 @@ void serialAvailable()
     {
       sendToSite("JSON decode failed");
     }
-    sendToSite("Made i4 here");
     Serial.flush();
   }
   //checkForAnyUserInput();
