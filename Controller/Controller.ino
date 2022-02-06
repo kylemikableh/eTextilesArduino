@@ -25,8 +25,8 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
  */
 
 #define DEBUG true // Enable or disable debug operation
-#define JSON_BUFFER_SIZE 256 // Size of JSON file in bytes
-#define CHAR_BUFFER_SIZE 256 // Size of CHAR* allocations in bytes
+#define JSON_BUFFER_SIZE 128 // Size of JSON file in bytes
+#define CHAR_BUFFER_SIZE 128 // Size of CHAR* allocations in bytes
 #define NULL_STRING "null" //String of null JSON might return
 #define START_TRANSMISSION_CHAR "#"
 #define END_TRANSMISSION_CHAR "$"
@@ -56,7 +56,7 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 #define UPDATE_LEDS_STYLE_FULL "full"
 #define UPDATE_LEDS_STYLE_BAR "bar"
 #define UPDATE_LEDS_STYLE_DIAGONAL "diagonal"
-#define UPDATE_LEDS_FIRST_COLOR "first_color"
+#define UPDATE_LEDS_FIRST_COLOR "first_color" // 8-digit string
 #define UPDATE_LEDS_SECOND_COLOR "second_color"
 
 /**
@@ -170,7 +170,12 @@ void sendToSite(char* data)
  */
 void processUpdate(DynamicJsonDocument json)
 {
-  sendToSite("Processing update");
+  sendToSite("Processing update.");
+  
+//  char sizeChar[8]; 
+//  itoa(json.size(),sizeChar,8);
+//  sendToSite(sizeChar);
+  
   const char* updateStr = json[UPDATE];
   if(DEBUG){sendToSite(updateStr);}
   if(strcmp(updateStr,NULL_STRING) == 0) {return;}
@@ -218,7 +223,7 @@ DynamicJsonDocument getJsonFromSite()
 {
   String jsonRecieved = Serial.readString();
   char jsonRecievedBuff[JSON_BUFFER_SIZE];
-  jsonRecieved.toCharArray(jsonRecievedBuff,jsonRecieved.length());
+  jsonRecieved.toCharArray(jsonRecievedBuff,jsonRecieved.length()+3); //the 3 is for the null termininator
   
   if(DEBUG) 
   {
@@ -248,7 +253,7 @@ void serialAvailable()
     if(!json.isNull())
     {
       sendToSite("Was not null. Test char size: 1234556778991234456678899012344546547i5i8");
-      processAction(json);
+      //processAction(json);
       processUpdate(json);
     }
     else
