@@ -5,6 +5,20 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 /** DO NOT REMOVE OR BREAK ME */
 
 #include <ArduinoJson.h>
+#include <Adafruit_NeoPixel.h>
+#include "FastLED.h"
+#include "LEDMatrix.h"
+
+/**
+ * Matrix Stuff
+ */
+#define MATRIX_WIDTH 8
+#define MATRIX_HEIGHT 8
+#define MATRIX_TYPE HORIZONTAL_ZIGZAG_MATRIX
+
+#define CHIPSET WS2812B
+#define LED_PIN 8
+#define COLOR_ORDER GRB
 
 /**
  * Constants/Config
@@ -45,7 +59,8 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 #define SOFT_POT_PIN_1 A0 // Pin connected to softpot wiper
 #define SOFT_POT_PIN_2 A1 // Pin connected to softpot wiper
 
-String activeTile;
+
+cLEDMatrix<MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_TYPE> leds;
 
 /**
  * Arduino setup function on powerup.
@@ -53,12 +68,18 @@ String activeTile;
 void setup() 
 {
   initalizePins();
+  setupLEDS();
   while (!Serial) {;} // Don't do anything unless Serial is active
   
   Serial.begin(115200);
   if(DEBUG) {sendToSite("{\"message\": \"Controller Paired.\"}");}
   Serial.flush();
-  activeTile = "NONE";
+}
+
+void setupLEDS()
+{
+  FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds[0], leds.Size());
+  FastLED.clear();
 }
 
 /**
@@ -69,35 +90,36 @@ void setup()
   pinMode(SOFT_POT_PIN_1, INPUT);
  }
 
-/**
- * Get the sent JSON from the site and convert it to JSON type
- * @args 
- * @returns DynamicJsonDocument json
- */
-DynamicJsonDocument getJsonFromSite() 
-{
-  String jsonRecieved = Serial.readString();
-  if(DEBUG) 
-  {
-    sendToSite(jsonRecieved);
-  }
-  
-  DynamicJsonDocument json(1024);
-  deserializeJson(json, jsonRecieved);
-  return json;
-}
+///**
+// * Send any data to site (Adds Start/end character to indicate start/end of a transmission)
+// * @args data String data to send
+// */
+//void sendToSite(String data) 
+//{
+//  String toSend = START_TRANSMISSION_CHAR + data + END_TRANSMISSION_CHAR; // Start and end markers to help process the JSON on the controller (it recieves in chunks of data)
+//  char buff[JSON_BUFFER_SIZE];
+//  toSend.toCharArray(buff,JSON_BUFFER_SIZE);
+//  Serial.write(buff);
+//  Serial.flush();
+//}
 
 /**
  * Send any data to site (Adds Start/end character to indicate start/end of a transmission)
  * @args data String data to send
  */
-void sendToSite(String data) 
+void sendToSite(char* data) 
 {
-  String toSend = START_TRANSMISSION_CHAR + data + END_TRANSMISSION_CHAR; // Start and end markers to help process the JSON on the controller (it recieves in chunks of data)
-  char buff[JSON_BUFFER_SIZE];
-  toSend.toCharArray(buff,JSON_BUFFER_SIZE);
-  Serial.write(buff);
+  char* startChar = START_TRANSMISSION_CHAR;
+  char* endChar = END_TRANSMISSION_CHAR;
+  char* delimit = "\0";
+  char* toSend = malloc(2 + JSON_BUFFER_SIZE);
+  strcpy(toSend, startChar);
+  strcat(toSend, data);
+  strcat(toSend, endChar);
+  strcat(toSend, delimit);
+  Serial.write(toSend);
   Serial.flush();
+  free(toSend);
 }
 
 /**
@@ -105,8 +127,39 @@ void sendToSite(String data)
  */
  void changeLEDS(DynamicJsonDocument json)
  {
-    String values = json[UPDATE_LEDS_VALUES];
-    sendToSite(values); //We parrot what we got
+    const char* values = json[UPDATE_LEDS_VALUES];
+    const char* style = "bar"; //Actually get these at some point
+
+    if(strcmp(style, "bar") == 0)
+    {
+      for(int i = 0; i < MATRIX_WIDTH; i++) 
+      {
+        for(int j = 0; j < 4; j++) 
+        {
+          leds(i, j) = CHSV(150, 255, 50);
+        }
+      }
+    }
+    else if(strcmp(style, "full") == 0)
+    {
+      for(int i = 0; i < MATRIX_WIDTH; i++) 
+      {
+        for(int j = 0; j < MATRIX_HEIGHT; j++) 
+        {
+          leds(i, j) = CHSV(150, 255, 50);
+        }
+      }
+    }
+    
+    else if(strcmp(style, "diagonal") == 0)
+    {
+      for(int i = 0; i < MATRIX_WIDTH; i++) {
+        for(int j = 0; j < i; j++) {
+          leds(i, j) = CHSV(150, 255, 50);
+        }
+      }
+    }     
+    FastLED.show();
  }
 
 /**
@@ -114,18 +167,17 @@ void sendToSite(String data)
  */
 void processUpdate(DynamicJsonDocument json)
 {
-  String update = json[UPDATE];
-  if(DEBUG){sendToSite(update);}
-
-  if(update.equalsIgnoreCase(NULL_STRING)) {return;}
-  else if (update.equalsIgnoreCase(UPDATE_LEDS)) 
+  const char* updateStr = json[UPDATE];
+  if(DEBUG){sendToSite(updateStr);}
+  if(strcmp(updateStr,NULL_STRING) == 0) {return;}
+  else if (strcmp(updateStr,UPDATE_LEDS) == 0) 
   {
     //Handle LED update
     changeLEDS(json);
   }
   else
   {
-    sendToSite("Update passed not supported, " + update);
+    //Update not supported
   }
 }
 
@@ -135,20 +187,47 @@ void processUpdate(DynamicJsonDocument json)
  */
 void processAction(DynamicJsonDocument json) 
 {
-  String action = json[ACTION];
+  const char* action = json[ACTION];
   if(DEBUG){sendToSite(action);}
   
-  if(action.equalsIgnoreCase(NULL_STRING)) {return;} //don't do anything if there was no action key
-  else if (action.equalsIgnoreCase(ACTION_BUTTON_PRESSED))
+  if(strcmp(action,NULL_STRING) == 0) {return;} //don't do anything if there was no action key
+  else if (strcmp(action,ACTION_BUTTON_PRESSED) == 0)
   {
     
   }
-  else if (action.equalsIgnoreCase(ACTION_TILE_REMOVED))
+  else if (strcmp(action,ACTION_TILE_REMOVED) == 0)
   {
     
   }
   
   //Handle cases here
+}
+
+/**
+ * Get the sent JSON from the site and convert it to JSON type
+ * @args 
+ * @returns DynamicJsonDocument json
+ */
+DynamicJsonDocument getJsonFromSite() 
+{
+  String jsonRecieved = Serial.readString();
+  char jsonRecievedBuff[JSON_BUFFER_SIZE];
+  jsonRecieved.toCharArray(jsonRecievedBuff,jsonRecieved.length());
+  
+  if(DEBUG) 
+  {
+    sendToSite(jsonRecievedBuff);
+  }
+  
+  DynamicJsonDocument json(JSON_BUFFER_SIZE);
+//  String error = deserializeJson(json, jsonRecieved).c_str();
+  deserializeJson(json, jsonRecieved);
+//  if(error)//If deserializeJson failed, report this
+//  {
+//    sendToSite("{\"message\": \"Esin\"}");
+//    sendToSite(error);
+//  }
+  return json;
 }
 
 /**
@@ -158,13 +237,23 @@ void serialAvailable()
 {
   if (Serial && Serial.available()) 
   {
+    sendToSite("Made it here");
     DynamicJsonDocument json = getJsonFromSite(); // Let's get the sent JSON
-    
-    processAction(json);
-    processUpdate(json);
+    sendToSite("Made i2 here");
+    if(!json.isNull())
+    {
+      sendToSite("Was not null.");
+      processAction(json);
+      processUpdate(json);
+    }
+    else
+    {
+      sendToSite("JSON decode failed");
+    }
+    sendToSite("Made i4 here");
     Serial.flush();
   }
-  checkForAnyUserInput();
+  //checkForAnyUserInput();
 }
 
 /**
@@ -185,7 +274,7 @@ void checkForButtonPress()
     doc[ACTION_ID] = buttonID;
     String output;
     serializeJson(doc, output);
-    sendToSite(output);
+    //sendToSite(output);
     delay(200); //Remove for testing only
    }
 }
@@ -199,7 +288,7 @@ void writeSliderInfo(char *type, int value)
   doc[ACTION_TYPE] = String(type);
   String output;
   serializeJson(doc, output);
-  sendToSite(output);
+  //sendToSite(output);
 }
 
 /**
@@ -264,7 +353,7 @@ void checkForPaletteChange()
     doc[ACTION_ID] = buttonID;
     String output;
     serializeJson(doc, output);
-    sendToSite(output);
+    //sendToSite(output);
     delay(200); //Remove for testing only
    }
 }

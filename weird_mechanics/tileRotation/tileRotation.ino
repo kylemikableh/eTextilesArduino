@@ -1,3 +1,9 @@
+/** DO NOT REMOVE OR BREAK ME */
+#include <WebUSB.h>
+WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
+#define Serial WebUSBSerial
+/** DO NOT REMOVE OR BREAK ME */
+
 #include <stdint.h>
 
 uint_8t [2] tile_orientation;
