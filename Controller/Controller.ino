@@ -18,7 +18,7 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 
 #define CHIPSET WS2812B
 #define LED_PIN 8
-#define COLOR_ORDER GRB
+#define COLOR_ORDER RGB
 
 /**
  * Constants/Config
@@ -56,8 +56,12 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 #define UPDATE_LEDS_STYLE_FULL "full"
 #define UPDATE_LEDS_STYLE_BAR "bar"
 #define UPDATE_LEDS_STYLE_DIAGONAL "diagonal"
-#define UPDATE_LEDS_FIRST_COLOR "first_color" // 8-digit string
-#define UPDATE_LEDS_SECOND_COLOR "second_color"
+#define UPDATE_LEDS_FIRST_COLOR_R "first_color_R"
+#define UPDATE_LEDS_FIRST_COLOR_G "first_color_G"
+#define UPDATE_LEDS_FIRST_COLOR_B "first_color_B"
+#define UPDATE_LEDS_SECOND_COLOR_R "second_color_R"
+#define UPDATE_LEDS_SECOND_COLOR_G "second_color_G"
+#define UPDATE_LEDS_SECOND_COLOR_B "second_color_B"
 
 /**
  * Define slider information
@@ -122,10 +126,20 @@ void sendToSite(char* data)
  void changeLEDS(DynamicJsonDocument json)
  {
     const char* values = json[UPDATE_LEDS_VALUES];
-    const char* style = json[UPDATE_LEDS_STYLE]; 
-    int firstColor = json[UPDATE_LEDS_FIRST_COLOR];
-    int secondColor = json[UPDATE_LEDS_SECOND_COLOR];
-    sendToSite(style);
+    const char* style = json[UPDATE_LEDS_STYLE];
+     
+    unsigned int firstColorR = json[UPDATE_LEDS_FIRST_COLOR_R];
+    unsigned int firstColorG = json[UPDATE_LEDS_FIRST_COLOR_G];
+    unsigned int firstColorB = json[UPDATE_LEDS_FIRST_COLOR_B];
+    
+    unsigned int secondColorR = json[UPDATE_LEDS_SECOND_COLOR_R];
+    unsigned int secondColorG = json[UPDATE_LEDS_SECOND_COLOR_G];
+    unsigned int secondColorB = json[UPDATE_LEDS_SECOND_COLOR_B];
+
+    char sizeChar[sizeof(unsigned int)]; 
+    itoa(firstColorB,sizeChar,10); //the 10 stands for base 10
+    sendToSite(sizeChar); //Make sure we are getting what we want
+    
     if(strcmp(style, UPDATE_LEDS_STYLE_BAR) == 0)
     {
       sendToSite("Style of BAR");
@@ -133,7 +147,7 @@ void sendToSite(char* data)
       {
         for(int j = 0; j < 4; j++) 
         {
-          leds(i, j) = CHSV(150, 255, 50);
+          leds(i, j) = CRGB(firstColorR, firstColorG, firstColorB);
         }
       }
     }
@@ -144,7 +158,7 @@ void sendToSite(char* data)
       {
         for(int j = 0; j < MATRIX_HEIGHT; j++) 
         {
-          leds(i, j) = CHSV(150, 255, 50);
+          leds(i, j) = CRGB(firstColorR, firstColorG, firstColorB);
         }
       }
     }
@@ -154,7 +168,7 @@ void sendToSite(char* data)
       sendToSite("Style of DIAG");
       for(int i = 0; i < MATRIX_WIDTH; i++) {
         for(int j = 0; j < i; j++) {
-          leds(i, j) = CHSV(150, 255, 50);
+          leds(i, j) = CRGB(firstColorR, firstColorG, firstColorB);
         }
       }
     }
@@ -170,14 +184,15 @@ void sendToSite(char* data)
  */
 void processUpdate(DynamicJsonDocument json)
 {
-  sendToSite("Processing update.");
-  
-//  char sizeChar[8]; 
-//  itoa(json.size(),sizeChar,8);
-//  sendToSite(sizeChar);
+  sendToSite("Processing update. MEM SIZE of JSON:");
+  char sizeChar[sizeof(int)]; 
+  itoa(json.size(),sizeChar,10); //10 is the base
+  sendToSite(sizeChar);
   
   const char* updateStr = json[UPDATE];
+  
   if(DEBUG){sendToSite(updateStr);}
+  
   if(strcmp(updateStr,NULL_STRING) == 0) {return;}
   else if (strcmp(updateStr,UPDATE_LEDS) == 0) 
   {
@@ -232,7 +247,6 @@ DynamicJsonDocument getJsonFromSite()
   
   DynamicJsonDocument json(JSON_BUFFER_SIZE);
   char* error = deserializeJson(json, jsonRecieved).c_str();
-//  deserializeJson(json, jsonRecieved);
   if(error)//If deserializeJson failed, report this
   {
     sendToSite("{\"message\": \"deserialize error?\"}");
@@ -253,7 +267,7 @@ void serialAvailable()
     if(!json.isNull())
     {
       sendToSite("Was not null. Test char size: 1234556778991234456678899012344546547i5i8");
-      //processAction(json);
+      processAction(json);
       processUpdate(json);
     }
     else
