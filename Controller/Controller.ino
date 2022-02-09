@@ -10,8 +10,8 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 #include "LEDMatrix.h"
 
 /**
- * Matrix Stuff
- */
+   Matrix Stuff
+*/
 #define MATRIX_WIDTH 8
 #define MATRIX_HEIGHT 8
 #define MATRIX_TYPE HORIZONTAL_ZIGZAG_MATRIX
@@ -21,20 +21,20 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 #define COLOR_ORDER RGB
 
 /**
- * Constants/Config
- */
+   Constants/Config
+*/
 
 #define DEBUG true // Enable or disable debug operation
-#define JSON_BUFFER_SIZE 128 // Size of JSON file in bytes
-#define CHAR_BUFFER_SIZE 128 // Size of CHAR* allocations in bytes
+#define JSON_BUFFER_SIZE 190 // Size of JSON file in bytes
+#define CHAR_BUFFER_SIZE 190 // Size of CHAR* allocations in bytes
 #define NULL_STRING "null" //String of null JSON might return
 #define START_TRANSMISSION_CHAR "#"
 #define END_TRANSMISSION_CHAR "$"
-#define LOWEST_SLIDER_VALUE 100 //Lowest value threshold for Slider values
+#define LOWEST_SLIDER_VALUE 50 //Lowest value threshold for Slider values
 
 /**
- * Action types
- */
+   Action types
+*/
 #define ACTION "action"
 #define ACTION_BUTTON_PRESSED "buttonPressed"
 #define ACTION_TILE_REMOVED "tileRemoved"
@@ -47,8 +47,8 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 #define ACTION_TYPE "type"
 
 /**
- * Update types
- */
+   Update types
+*/
 #define UPDATE "update"
 #define UPDATE_LEDS "LEDS"
 #define UPDATE_LEDS_VALUES "values"
@@ -56,6 +56,8 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 #define UPDATE_LEDS_STYLE_FULL "full"
 #define UPDATE_LEDS_STYLE_BAR "bar"
 #define UPDATE_LEDS_STYLE_DIAGONAL "diagonal"
+#define UPDATE_LEDS_STYLE_ISO "iso"
+#define UPDATE_LEDS_STYLE_DRUNK "drunk"
 #define UPDATE_LEDS_FIRST_COLOR_R "first_color_R"
 #define UPDATE_LEDS_FIRST_COLOR_G "first_color_G"
 #define UPDATE_LEDS_FIRST_COLOR_B "first_color_B"
@@ -64,8 +66,8 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 #define UPDATE_LEDS_SECOND_COLOR_B "second_color_B"
 
 /**
- * Define slider information
- */
+   Define slider information
+*/
 
 #define SOFT_POT_PIN_1 A0 // Pin connected to softpot wiper
 #define SOFT_POT_PIN_2 A1 // Pin connected to softpot wiper
@@ -74,16 +76,20 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 cLEDMatrix<MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_TYPE> leds;
 
 /**
- * Arduino setup function on powerup.
- */
-void setup() 
+   Arduino setup function on powerup.
+*/
+void setup()
 {
   initalizePins();
   setupLEDS();
-  while (!Serial) {;} // Don't do anything unless Serial is active
-  
+  while (!Serial) {
+    ; // Don't do anything unless Serial is active
+  }
+
   Serial.begin(115200);
-  if(DEBUG) {sendToSite("{\"message\": \"Controller Paired.\"}");}
+  if (DEBUG) {
+    sendToSite("{\"message\": \"Controller Paired.\"}");
+  }
   Serial.flush();
 }
 
@@ -91,21 +97,22 @@ void setupLEDS()
 {
   FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds[0], leds.Size());
   FastLED.clear();
+  FastLED.show();
 }
 
 /**
- * Initalize pins for use
- */
- void initalizePins()
- {
+   Initalize pins for use
+*/
+void initalizePins()
+{
   pinMode(SOFT_POT_PIN_1, INPUT);
- }
+}
 
 /**
- * Send any data to site (Adds Start/end character to indicate start/end of a transmission)
- * @args data char* data to send over serial
- */
-void sendToSite(char* data) 
+   Send any data to site (Adds Start/end character to indicate start/end of a transmission)
+   @args data char* data to send over serial
+*/
+void sendToSite(char* data)
 {
   const char* startChar = START_TRANSMISSION_CHAR;
   const char* endChar = END_TRANSMISSION_CHAR;
@@ -121,80 +128,167 @@ void sendToSite(char* data)
 }
 
 /**
- * LED Controller
- */
- void changeLEDS(DynamicJsonDocument json)
- {
-    const char* values = json[UPDATE_LEDS_VALUES];
-    const char* style = json[UPDATE_LEDS_STYLE];
-     
-    unsigned int firstColorR = json[UPDATE_LEDS_FIRST_COLOR_R];
-    unsigned int firstColorG = json[UPDATE_LEDS_FIRST_COLOR_G];
-    unsigned int firstColorB = json[UPDATE_LEDS_FIRST_COLOR_B];
-    
-    unsigned int secondColorR = json[UPDATE_LEDS_SECOND_COLOR_R];
-    unsigned int secondColorG = json[UPDATE_LEDS_SECOND_COLOR_G];
-    unsigned int secondColorB = json[UPDATE_LEDS_SECOND_COLOR_B];
+   LED Controller
+*/
+void changeLEDS(DynamicJsonDocument json)
+{
+  FastLED.clear();
+  const char* values = json[UPDATE_LEDS_VALUES];
+  const char* style = json[UPDATE_LEDS_STYLE];
 
-    char sizeChar[sizeof(unsigned int)]; 
-    itoa(firstColorB,sizeChar,10); //the 10 stands for base 10
-    sendToSite(sizeChar); //Make sure we are getting what we want
-    
-    if(strcmp(style, UPDATE_LEDS_STYLE_BAR) == 0)
+  unsigned int firstColorG = json[UPDATE_LEDS_FIRST_COLOR_R];
+  unsigned int firstColorR = json[UPDATE_LEDS_FIRST_COLOR_G];
+  unsigned int firstColorB = json[UPDATE_LEDS_FIRST_COLOR_B];
+
+  unsigned int secondColorG = json[UPDATE_LEDS_SECOND_COLOR_R];
+  unsigned int secondColorR = json[UPDATE_LEDS_SECOND_COLOR_G];
+  unsigned int secondColorB = json[UPDATE_LEDS_SECOND_COLOR_B];
+
+  char sizeChar[sizeof(unsigned int)];
+  itoa(secondColorR, sizeChar, 10); //the 10 stands for base 10
+  sendToSite("This is the LED value: ");
+  sendToSite(sizeChar); //Make sure we are getting what we want
+
+  if (strcmp(style, UPDATE_LEDS_STYLE_BAR) == 0)
+  {
+    sendToSite("Style of BAR");
+    for (int i = 0; i < MATRIX_WIDTH; i++)
     {
-      sendToSite("Style of BAR");
-      for(int i = 0; i < MATRIX_WIDTH; i++) 
+      for (int j = 0; j < 4; j++)
       {
-        for(int j = 0; j < 4; j++) 
-        {
-          leds(i, j) = CRGB(firstColorR, firstColorG, firstColorB);
-        }
+        leds(i, j) = CRGB(firstColorR, firstColorG, firstColorB);
       }
     }
-    else if(strcmp(style, UPDATE_LEDS_STYLE_FULL) == 0)
+    for (int i = 0; i < MATRIX_WIDTH; i++)
     {
-      sendToSite("Style of FULL");
-      for(int i = 0; i < MATRIX_WIDTH; i++) 
+      for (int j = 4; j < 8; j++)
       {
-        for(int j = 0; j < MATRIX_HEIGHT; j++) 
-        {
-          leds(i, j) = CRGB(firstColorR, firstColorG, firstColorB);
-        }
+        leds(i, j) = CRGB(secondColorR, secondColorG, secondColorB);
       }
     }
-    
-    else if(strcmp(style, UPDATE_LEDS_STYLE_DIAGONAL) == 0)
+  }
+  else if (strcmp(style, UPDATE_LEDS_STYLE_FULL) == 0)
+  {
+    sendToSite("Style of FULL");
+    for (int i = 0; i < MATRIX_WIDTH; i++)
     {
-      sendToSite("Style of DIAG");
-      for(int i = 0; i < MATRIX_WIDTH; i++) {
-        for(int j = 0; j < i; j++) {
-          leds(i, j) = CRGB(firstColorR, firstColorG, firstColorB);
-        }
+      for (int j = 0; j < MATRIX_HEIGHT; j++)
+      {
+        leds(i, j) = CRGB(firstColorR, firstColorG, firstColorB);
       }
     }
-    else
-    {
-      sendToSite("Type of LED update not given.");     
+  }
+
+  else if (strcmp(style, UPDATE_LEDS_STYLE_DIAGONAL) == 0)
+  {
+    sendToSite("Style of DIAG");
+    for (int i = 0; i < MATRIX_WIDTH; i++) {
+      for (int j = 0; j < i; j++) {
+        leds(i, j) = CRGB(firstColorR, firstColorG, firstColorB);
+      }
     }
-    FastLED.show();
- }
+    for (int i = 0; i < MATRIX_WIDTH - 1; i++) {
+      for (int j = i + 1; j < 8; j++) {
+        leds(i, j) = CRGB(secondColorR, secondColorG, secondColorB);
+      }
+    }
+  }
+  else if (strcmp(style, UPDATE_LEDS_STYLE_DRUNK) == 0)
+  {
+    for (int i = 0; i < 6; i++)
+    {
+      for (int j = 0; j < 6; j++)
+      {
+        leds(i, j) = CRGB(firstColorR, firstColorG, firstColorB);
+      }
+    }
+    for (int m = 0; m < 4; m++)
+    {
+      leds(6, m) = CRGB(firstColorR, firstColorG, firstColorB);
+      leds(m, 6) = CRGB(firstColorR, firstColorG, firstColorB);
+    }
+    for (int n = 0; n < 8; n++)
+    {
+      leds(7, n) = CRGB(secondColorR, secondColorG, secondColorB);
+      leds(n, 7) = CRGB(secondColorR, secondColorG, secondColorB);
+    }
+    for (int i = 4; i < 7; i++)
+    {
+      leds(6, i) = CRGB(secondColorR, secondColorG, secondColorB);
+      leds(i, 6) = CRGB(secondColorR, secondColorG, secondColorB);
+      }
+  }
+  else if (strcmp(style, UPDATE_LEDS_STYLE_ISO) == 0)
+  {
+    //Isoceles
+    for (int i = 0; i < MATRIX_WIDTH; i++)
+    {
+      leds(i, 0) = CRGB(firstColorR, firstColorG, firstColorB);
+    }
+    for (int k = 1; k < 3; k++)
+    {
+      for (int j = 1; j < 7; j++)
+      {
+        leds(j, k) = CRGB(firstColorR, firstColorG, firstColorB);
+      }
+    }
+    for (int m = 3; m < 5; m++)
+    {
+      for (int n = 2; n < 6; n++)
+      {
+        leds(n, m) = CRGB(firstColorR, firstColorG, firstColorB);
+      }
+    }
+    leds(3, 5) = CRGB(firstColorR, firstColorG, firstColorB);
+    leds(4, 5) = CRGB(firstColorR, firstColorG, firstColorB);
+    leds(3, 6) = CRGB(firstColorR, firstColorG, firstColorB);
+    leds(4, 6) = CRGB(firstColorR, firstColorG, firstColorB);
+    leds(3, 7) = CRGB(firstColorR, firstColorG, firstColorB);
+
+    for (int i = 1; i < 8; i++)
+    {
+      leds(0, i) = CRGB(secondColorR, secondColorG, secondColorB);
+      leds(7, i) = CRGB(secondColorR, secondColorG, secondColorB);
+    }
+    for (int j = 3; j < 8; j++)
+    {
+      leds(1, j) = CRGB(secondColorR, secondColorG, secondColorB);
+      leds(6, j) = CRGB(secondColorR, secondColorG, secondColorB);
+    }
+    for (int k = 5; k < 8; k++)
+    {
+      leds(2, k) = CRGB(secondColorR, secondColorG, secondColorB);
+      leds(5, k) = CRGB(secondColorR, secondColorG, secondColorB);
+    }
+    leds(4, 7) = CRGB(secondColorR, secondColorG, secondColorB);
+  }
+  else
+  {
+    sendToSite("Type of LED update not given.");
+  }
+  FastLED.show();
+}
 
 /**
- * Process update sent to controller
- */
+   Process update sent to controller
+*/
 void processUpdate(DynamicJsonDocument json)
 {
   sendToSite("Processing update. MEM SIZE of JSON:");
-  char sizeChar[sizeof(int)]; 
-  itoa(json.size(),sizeChar,10); //10 is the base
+  char sizeChar[sizeof(int)];
+  itoa(json.size(), sizeChar, 10); //10 is the base
   sendToSite(sizeChar);
-  
+
   const char* updateStr = json[UPDATE];
-  
-  if(DEBUG){sendToSite(updateStr);}
-  
-  if(strcmp(updateStr,NULL_STRING) == 0) {return;}
-  else if (strcmp(updateStr,UPDATE_LEDS) == 0) 
+
+  if (DEBUG) {
+    sendToSite(updateStr);
+  }
+
+  if (strcmp(updateStr, NULL_STRING) == 0) {
+    return;
+  }
+  else if (strcmp(updateStr, UPDATE_LEDS) == 0)
   {
     //Handle LED update
     changeLEDS(json);
@@ -208,46 +302,50 @@ void processUpdate(DynamicJsonDocument json)
 }
 
 /**
- * Handle the action passed
- * @args json JSON from site
- */
-void processAction(DynamicJsonDocument json) 
+   Handle the action passed
+   @args json JSON from site
+*/
+void processAction(DynamicJsonDocument json)
 {
   const char* action = json[ACTION];
-  if(DEBUG){sendToSite(action);}
-  
-  if(strcmp(action,NULL_STRING) == 0) {return;} //don't do anything if there was no action key
-  else if (strcmp(action,ACTION_BUTTON_PRESSED) == 0)
-  {
-    
+  if (DEBUG) {
+    sendToSite(action);
   }
-  else if (strcmp(action,ACTION_TILE_REMOVED) == 0)
-  {
-    
+
+  if (strcmp(action, NULL_STRING) == 0) {
+    return; //don't do anything if there was no action key
   }
-  
+  else if (strcmp(action, ACTION_BUTTON_PRESSED) == 0)
+  {
+
+  }
+  else if (strcmp(action, ACTION_TILE_REMOVED) == 0)
+  {
+
+  }
+
   //Handle cases here
 }
 
 /**
- * Get the sent JSON from the site and convert it to JSON type
- * @args 
- * @returns DynamicJsonDocument json
- */
-DynamicJsonDocument getJsonFromSite() 
+   Get the sent JSON from the site and convert it to JSON type
+   @args
+   @returns DynamicJsonDocument json
+*/
+DynamicJsonDocument getJsonFromSite()
 {
   String jsonRecieved = Serial.readString();
   char jsonRecievedBuff[JSON_BUFFER_SIZE];
-  jsonRecieved.toCharArray(jsonRecievedBuff,jsonRecieved.length()+3); //the 3 is for the null termininator
-  
-  if(DEBUG) 
+  jsonRecieved.toCharArray(jsonRecievedBuff, jsonRecieved.length() + 3); //the 3 is for the null termininator
+
+  if (DEBUG)
   {
     sendToSite(jsonRecievedBuff);
   }
-  
+
   DynamicJsonDocument json(JSON_BUFFER_SIZE);
   char* error = deserializeJson(json, jsonRecieved).c_str();
-  if(error)//If deserializeJson failed, report this
+  if (error) //If deserializeJson failed, report this
   {
     sendToSite("{\"message\": \"deserialize error?\"}");
     sendToSite(error);
@@ -256,15 +354,15 @@ DynamicJsonDocument getJsonFromSite()
 }
 
 /**
- * 
- */
-void serialAvailable() 
+
+*/
+void serialAvailable()
 {
-  if (Serial && Serial.available()) 
+  if (Serial && Serial.available())
   {
     sendToSite("Made it here");
     DynamicJsonDocument json = getJsonFromSite(); // Let's get the sent JSON
-    if(!json.isNull())
+    if (!json.isNull())
     {
       sendToSite("Was not null. Test char size: 1234556778991234456678899012344546547i5i8");
       processAction(json);
@@ -280,14 +378,14 @@ void serialAvailable()
 }
 
 /**
- * Check for all buttons to be pressed and send this to controller
- */
+   Check for all buttons to be pressed and send this to controller
+*/
 void checkForButtonPress()
 {
   //figure out which button is pressed
   bool changeDetected = false;
-  
-  if(changeDetected) 
+
+  if (changeDetected)
   {
     //This is for handling which page we are viewing
     char buttonID = 0; //Set this to button ID detected
@@ -299,7 +397,7 @@ void checkForButtonPress()
     serializeJson(doc, output, CHAR_BUFFER_SIZE);
     sendToSite(output);
     free(output);
-   }
+  }
 }
 
 void writeSliderInfo(char *type, int value)
@@ -316,8 +414,8 @@ void writeSliderInfo(char *type, int value)
 }
 
 /**
- * See if the sliders has moved, if so report back to site
- */
+   See if the sliders has moved, if so report back to site
+*/
 void checkForSlider()
 {
   // Read in the soft pot's ADC value
@@ -329,46 +427,46 @@ void checkForSlider()
   int softPotADC2 = analogRead(SOFT_POT_PIN_2);
   // Map the 0-1023 value to 0-255
   int softPotPosition2 = map(softPotADC2, 0, 1023, 1, 365);
-  if(softPotPosition1 != NULL && softPotPosition1 >= LOWEST_SLIDER_VALUE) //If it is not zero do something
+  if (softPotPosition1 != NULL && softPotPosition1 >= LOWEST_SLIDER_VALUE) //If it is not zero do something
   {
     writeSliderInfo("S0", softPotPosition1);
   }
-//  if(softPotPosition2 != NULL && softPotPosition2 >= LOWEST_SLIDER_VALUE) //If it is not zero do something
-//  {
-//    writeSliderInfo("S1", softPotPosition2);
-//  }
+  //  if(softPotPosition2 != NULL && softPotPosition2 >= LOWEST_SLIDER_VALUE) //If it is not zero do something
+  //  {
+  //    writeSliderInfo("S1", softPotPosition2);
+  //  }
   //For demonstration purposes
-//  for(int i = 0; i < 355; i++) 
-//  {
-//    writeSliderInfo("S1", i);
-//    delay(100);
-//  }
+  //  for(int i = 0; i < 355; i++)
+  //  {
+  //    writeSliderInfo("S1", i);
+  //    delay(100);
+  //  }
 }
 
 /**
- * See if a tile was removed, if so store this information and report
- */
+   See if a tile was removed, if so store this information and report
+*/
 void checkForTileRemoval()
 {
-  
+
 }
 
 /**
- * See if a tile was placed, if so act accordingly
- */
+   See if a tile was placed, if so act accordingly
+*/
 void checkForTilePlacement()
 {
-  
+
 }
 
 /**
- * See if a palette change
- */
+   See if a palette change
+*/
 void checkForPaletteChange()
 {
   //Do the checking here, check with teammates, button 0-5 is the palette buttons
   bool changeDetected = false;
-  if(changeDetected) 
+  if (changeDetected)
   {
     char buttonID = 0; //Set this to button ID detected
     const int capacity = JSON_OBJECT_SIZE(6);
@@ -379,13 +477,13 @@ void checkForPaletteChange()
     serializeJson(doc, output, CHAR_BUFFER_SIZE);
     sendToSite(output);
     free(output);
-   }
+  }
 }
 
 
 /**
- * Check for all user inputs on the controller
- */
+   Check for all user inputs on the controller
+*/
 void checkForAnyUserInput()
 {
   checkForButtonPress();
@@ -396,9 +494,9 @@ void checkForAnyUserInput()
 }
 
 /**
- * Arduino loop function
- */
-void loop() 
+   Arduino loop function
+*/
+void loop()
 {
   serialAvailable();
 }
