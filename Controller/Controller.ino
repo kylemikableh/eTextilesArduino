@@ -25,12 +25,12 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 */
 
 #define DEBUG true // Enable or disable debug operation
-#define JSON_BUFFER_SIZE 190 // Size of JSON file in bytes
-#define CHAR_BUFFER_SIZE 190 // Size of CHAR* allocations in bytes
+#define JSON_BUFFER_SIZE 128 // Size of JSON file in bytes
+#define CHAR_BUFFER_SIZE 128 // Size of CHAR* allocations in bytes
 #define NULL_STRING "null" //String of null JSON might return
 #define START_TRANSMISSION_CHAR "#"
 #define END_TRANSMISSION_CHAR "$"
-#define LOWEST_SLIDER_VALUE 50 //Lowest value threshold for Slider values
+#define LOWEST_SLIDER_VALUE 200 //Lowest value threshold for Slider values
 
 /**
    Action types
@@ -127,6 +127,14 @@ void sendToSite(char* data)
   free(toSend); //Don't want no memory leaks!
 }
 
+unsigned int firstColorG = 0;
+unsigned int firstColorR = 0;
+unsigned int firstColorB = 0;
+
+unsigned int secondColorG = 0;
+unsigned int secondColorR = 0;
+unsigned int secondColorB = 0;
+
 /**
    LED Controller
 */
@@ -136,13 +144,18 @@ void changeLEDS(DynamicJsonDocument json)
   const char* values = json[UPDATE_LEDS_VALUES];
   const char* style = json[UPDATE_LEDS_STYLE];
 
-  unsigned int firstColorG = json[UPDATE_LEDS_FIRST_COLOR_R];
-  unsigned int firstColorR = json[UPDATE_LEDS_FIRST_COLOR_G];
-  unsigned int firstColorB = json[UPDATE_LEDS_FIRST_COLOR_B];
-
-  unsigned int secondColorG = json[UPDATE_LEDS_SECOND_COLOR_R];
-  unsigned int secondColorR = json[UPDATE_LEDS_SECOND_COLOR_G];
-  unsigned int secondColorB = json[UPDATE_LEDS_SECOND_COLOR_B];
+  if(json.containsKey(UPDATE_LEDS_FIRST_COLOR_R))
+  {
+    firstColorG = json[UPDATE_LEDS_FIRST_COLOR_R];
+    firstColorR = json[UPDATE_LEDS_FIRST_COLOR_G];
+    firstColorB = json[UPDATE_LEDS_FIRST_COLOR_B];
+  }
+  if(json.containsKey(UPDATE_LEDS_SECOND_COLOR_R))
+  {
+    secondColorG = json[UPDATE_LEDS_SECOND_COLOR_R];
+    secondColorR = json[UPDATE_LEDS_SECOND_COLOR_G];
+    secondColorB = json[UPDATE_LEDS_SECOND_COLOR_B];
+  }
 
   char sizeChar[sizeof(unsigned int)];
   itoa(secondColorR, sizeChar, 10); //the 10 stands for base 10
