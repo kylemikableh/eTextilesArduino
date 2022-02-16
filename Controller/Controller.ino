@@ -8,7 +8,16 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 #include <Adafruit_NeoPixel.h>
 #include "FastLED.h"
 #include "LEDMatrix.h"
+#include "Adafruit_MPR121.h"
 
+/**
+ * Touch sensor defines
+ */
+#ifndef _BV
+#define _BV(bit) (1 << (bit)) 
+#endif
+#define TOTAL_BUTTONS 12
+ 
 /**
    Matrix Stuff
 */
@@ -74,6 +83,10 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 
 
 cLEDMatrix<MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_TYPE> leds;
+Adafruit_MPR121 cap = Adafruit_MPR121();
+boolean foundTouchSensor = false; //Did we find the touch sensor? If not don't try!
+uint16_t lastTouchedSensor = 0; //holding values of buttons
+uint16_t currTouchedSensor = 0; //holding values of buttons
 
 /**
    Arduino setup function on powerup.
@@ -91,6 +104,19 @@ void setup()
     sendToSite("{\"message\": \"Controller Paired.\"}");
   }
   Serial.flush();
+
+  /**
+   * Check for the Capacitive sensor
+   */
+  if (cap.begin(0x5A)) 
+  {
+    sendToSite("MPR121 found!");
+    foundTouchSensor = true;
+  }
+  else
+  {
+    sendToSite("MPR121 not found, check wiring?");
+  }
 }
 
 void setupLEDS()
@@ -395,21 +421,50 @@ void serialAvailable()
 */
 void checkForButtonPress()
 {
-  //figure out which button is pressed
-  bool changeDetected = false;
-
-  if (changeDetected)
+  if(foundTouchSensor) //If we found the touch sensor we can procede!
   {
-    //This is for handling which page we are viewing
-    char buttonID = 0; //Set this to button ID detected
-    const int capacity = JSON_OBJECT_SIZE(6);
-    StaticJsonDocument<capacity> doc;
-    doc[ACTION] = ACTION_BUTTON_PRESSED;
-    doc[ACTION_ID] = buttonID;
-    char* output = malloc(CHAR_BUFFER_SIZE);
-    serializeJson(doc, output, CHAR_BUFFER_SIZE);
-    sendToSite(output);
-    free(output);
+      //figure out which button is pressed
+    bool changeDetected = false;
+  
+    /**
+     * Check touch sensor
+     */
+    currTouchedSensor = cap.touched();
+    
+    for (uint8_t i=0; i<TOTAL_BUTTONS; i++) 
+    {
+      // it if *is* touched and *wasnt* touched before, alert!
+      if ((currTouchedSensor & _BV(i)) && !(lastTouchedSensor & _BV(i)) ) 
+      {
+        char touchID[sizeof(int)];
+        itoa(i, touchID, 10); //10 is the base
+        sendToSite("Touch was detected! Waiting on release of: ");
+        sendToSite(touchID);
+      }
+      // if it *was* touched and now *isnt*, alert!
+      if (!(currTouchedSensor & _BV(i)) && (lastTouchedSensor & _BV(i)) ) 
+      {
+        char touchID[sizeof(int)];
+        itoa(i, touchID, 10); //10 is the base
+        sendToSite("Release was detected! Waiting on release of: ");
+        sendToSite(touchID);
+      }
+    }
+    lastTouchedSensor = currTouchedSensor;
+//    Work on the JSON to send next
+//    if (changeDetected)
+//    {
+//      //This is for handling which page we are viewing
+//      char buttonID = 0; //Set this to button ID detected
+//      const int capacity = JSON_OBJECT_SIZE(6);
+//      StaticJsonDocument<capacity> doc;
+//      doc[ACTION] = ACTION_BUTTON_PRESSED;
+//      doc[ACTION_ID] = buttonID;
+//      char* output = malloc(CHAR_BUFFER_SIZE);
+//      serializeJson(doc, output, CHAR_BUFFER_SIZE);
+//      sendToSite(output);
+//      free(output);
+//    }
   }
 }
 
