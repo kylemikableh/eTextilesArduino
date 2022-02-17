@@ -8,7 +8,16 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 #include <Adafruit_NeoPixel.h>
 #include "FastLED.h"
 #include "LEDMatrix.h"
+#include "Adafruit_MPR121.h"
 
+/**
+ * Touch sensor defines
+ */
+#ifndef _BV
+#define _BV(bit) (1 << (bit)) 
+#endif
+#define TOTAL_BUTTONS 12
+ 
 /**
    Matrix Stuff
 */
@@ -25,25 +34,23 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 */
 
 #define DEBUG true // Enable or disable debug operation
-#define JSON_BUFFER_SIZE 190 // Size of JSON file in bytes
-#define CHAR_BUFFER_SIZE 190 // Size of CHAR* allocations in bytes
+#define JSON_BUFFER_SIZE 128 // Size of JSON file in bytes
+#define CHAR_BUFFER_SIZE 128 // Size of CHAR* allocations in bytes
 #define NULL_STRING "null" //String of null JSON might return
 #define START_TRANSMISSION_CHAR "#"
 #define END_TRANSMISSION_CHAR "$"
-#define LOWEST_SLIDER_VALUE 50 //Lowest value threshold for Slider values
+#define LOWEST_SLIDER_VALUE 200 //Lowest value threshold for Slider values
 
 /**
    Action types
 */
 #define ACTION "action"
 #define ACTION_BUTTON_PRESSED "buttonPressed"
-#define ACTION_TILE_REMOVED "tileRemoved"
-#define ACTION_TILE_PLACED "tilePlaced"
+#define ACTION_BUTTON_RELEASED "buttonReleased"
+//#define ACTION_TILE_REMOVED "tileRemoved"
+//#define ACTION_TILE_PLACED "tilePlaced"
 #define ACTION_SLIDER_MOVED "sliderMoved"
 #define ACTION_ID "ID"
-#define ACTION_ID_BUTTON "B"
-#define ACTION_ID_TILE "T"
-#define ACTION_ID_SLIDER "S"
 #define ACTION_TYPE "type"
 
 /**
@@ -69,11 +76,15 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
    Define slider information
 */
 
-#define SOFT_POT_PIN_1 A0 // Pin connected to softpot wiper
-#define SOFT_POT_PIN_2 A1 // Pin connected to softpot wiper
+#define SOFT_POT_PIN_1 A0 // Pin connected to slider1
+#define SOFT_POT_PIN_2 A1 // Pin connected to slider2
 
 
 cLEDMatrix<MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_TYPE> leds;
+Adafruit_MPR121 cap = Adafruit_MPR121();
+boolean foundTouchSensor = false; //Did we find the touch sensor? If not don't try!
+uint16_t lastTouchedSensor = 0; //holding values of buttons
+uint16_t currTouchedSensor = 0; //holding values of buttons
 
 /**
    Arduino setup function on powerup.
@@ -82,15 +93,30 @@ void setup()
 {
   initalizePins();
   setupLEDS();
-  while (!Serial) {
+  while (!Serial) 
+  {
     ; // Don't do anything unless Serial is active
   }
 
   Serial.begin(115200);
-  if (DEBUG) {
+  if (DEBUG) 
+  {
     sendToSite("{\"message\": \"Controller Paired.\"}");
   }
   Serial.flush();
+
+  /**
+   * Check for the Capacitive sensor
+   */
+  if (cap.begin(0x5A)) 
+  {
+    sendToSite("MPR121 touch sensor found!");
+    foundTouchSensor = true;
+  }
+  else
+  {
+    sendToSite("MPR121 not found, check wiring?");
+  }
 }
 
 void setupLEDS()
@@ -127,6 +153,14 @@ void sendToSite(char* data)
   free(toSend); //Don't want no memory leaks!
 }
 
+unsigned int firstColorG = 0;
+unsigned int firstColorR = 0;
+unsigned int firstColorB = 0;
+
+unsigned int secondColorG = 0;
+unsigned int secondColorR = 0;
+unsigned int secondColorB = 0;
+
 /**
    LED Controller
 */
@@ -136,13 +170,18 @@ void changeLEDS(DynamicJsonDocument json)
   const char* values = json[UPDATE_LEDS_VALUES];
   const char* style = json[UPDATE_LEDS_STYLE];
 
-  unsigned int firstColorG = json[UPDATE_LEDS_FIRST_COLOR_R];
-  unsigned int firstColorR = json[UPDATE_LEDS_FIRST_COLOR_G];
-  unsigned int firstColorB = json[UPDATE_LEDS_FIRST_COLOR_B];
-
-  unsigned int secondColorG = json[UPDATE_LEDS_SECOND_COLOR_R];
-  unsigned int secondColorR = json[UPDATE_LEDS_SECOND_COLOR_G];
-  unsigned int secondColorB = json[UPDATE_LEDS_SECOND_COLOR_B];
+  if(json.containsKey(UPDATE_LEDS_FIRST_COLOR_R))
+  {
+    firstColorG = json[UPDATE_LEDS_FIRST_COLOR_R];
+    firstColorR = json[UPDATE_LEDS_FIRST_COLOR_G];
+    firstColorB = json[UPDATE_LEDS_FIRST_COLOR_B];
+  }
+  if(json.containsKey(UPDATE_LEDS_SECOND_COLOR_R))
+  {
+    secondColorG = json[UPDATE_LEDS_SECOND_COLOR_R];
+    secondColorR = json[UPDATE_LEDS_SECOND_COLOR_G];
+    secondColorB = json[UPDATE_LEDS_SECOND_COLOR_B];
+  }
 
   char sizeChar[sizeof(unsigned int)];
   itoa(secondColorR, sizeChar, 10); //the 10 stands for base 10
@@ -274,18 +313,15 @@ void changeLEDS(DynamicJsonDocument json)
 */
 void processUpdate(DynamicJsonDocument json)
 {
-  sendToSite("Processing update. MEM SIZE of JSON:");
-  char sizeChar[sizeof(int)];
-  itoa(json.size(), sizeChar, 10); //10 is the base
-  sendToSite(sizeChar);
-
   const char* updateStr = json[UPDATE];
 
-  if (DEBUG) {
+  if (DEBUG) 
+  {
     sendToSite(updateStr);
   }
 
-  if (strcmp(updateStr, NULL_STRING) == 0) {
+  if (strcmp(updateStr, NULL_STRING) == 0) 
+  {
     return;
   }
   else if (strcmp(updateStr, UPDATE_LEDS) == 0)
@@ -307,24 +343,25 @@ void processUpdate(DynamicJsonDocument json)
 */
 void processAction(DynamicJsonDocument json)
 {
-  const char* action = json[ACTION];
-  if (DEBUG) {
-    sendToSite(action);
-  }
-
-  if (strcmp(action, NULL_STRING) == 0) {
-    return; //don't do anything if there was no action key
-  }
-  else if (strcmp(action, ACTION_BUTTON_PRESSED) == 0)
-  {
-
-  }
-  else if (strcmp(action, ACTION_TILE_REMOVED) == 0)
-  {
-
-  }
-
-  //Handle cases here
+//  const char* action = json[ACTION];
+//  if (DEBUG) 
+//  {
+//    sendToSite(action);
+//  }
+//
+//  if (strcmp(action, NULL_STRING) == 0) {
+//    return; //don't do anything if there was no action key
+//  }
+//  else if (strcmp(action, ACTION_BUTTON_PRESSED) == 0)
+//  {
+//
+//  }
+//  else if (strcmp(action, ACTION_TILE_REMOVED) == 0)
+//  {
+//
+//  }
+//
+//  //Handle cases here
 }
 
 /**
@@ -382,21 +419,61 @@ void serialAvailable()
 */
 void checkForButtonPress()
 {
-  //figure out which button is pressed
-  bool changeDetected = false;
-
-  if (changeDetected)
+  if(foundTouchSensor) //If we found the touch sensor we can procede!
   {
-    //This is for handling which page we are viewing
-    char buttonID = 0; //Set this to button ID detected
-    const int capacity = JSON_OBJECT_SIZE(6);
-    StaticJsonDocument<capacity> doc;
-    doc[ACTION] = ACTION_BUTTON_PRESSED;
-    doc[ACTION_ID] = buttonID;
-    char* output = malloc(CHAR_BUFFER_SIZE);
-    serializeJson(doc, output, CHAR_BUFFER_SIZE);
-    sendToSite(output);
-    free(output);
+      //figure out which button is pressed
+    bool touchDetected = false;
+    bool releaseDetected = false;
+    uint8_t buttonID = 0;
+  
+    /**
+     * Check touch sensor
+     */
+    currTouchedSensor = cap.touched();
+    
+    for (uint8_t i=0; i<TOTAL_BUTTONS; i++) 
+    {
+      // it if *is* touched and *wasnt* touched before, alert!
+      if ((currTouchedSensor & _BV(i)) && !(lastTouchedSensor & _BV(i)) ) 
+      {
+//        char touchID[sizeof(int)];
+//        itoa(i, touchID, 10); //10 is the base
+//        sendToSite("Touch was detected! Waiting on release of: ");
+//        sendToSite(touchID);
+        touchDetected = true;
+        buttonID = i;
+      }
+      else if (!(currTouchedSensor & _BV(i)) && (lastTouchedSensor & _BV(i)) ) 
+      {
+//        char touchID[sizeof(int)];
+//        itoa(i, touchID, 10); //10 is the base
+//        sendToSite("Release was detected! Waiting on release of: ");
+//        sendToSite(touchID);
+        releaseDetected = true;
+        buttonID = i;
+      }
+
+      if(touchDetected || releaseDetected)
+      {
+        //This is for handling which page we are viewing
+        const int capacity = JSON_OBJECT_SIZE(6);
+        StaticJsonDocument<capacity> doc;
+        doc[ACTION_ID] = buttonID;
+        if(touchDetected)
+        {
+          doc[ACTION] = ACTION_BUTTON_PRESSED;
+        }
+        else if(releaseDetected)
+        {
+          doc[ACTION] = ACTION_BUTTON_RELEASED;
+        }
+        char* output = malloc(CHAR_BUFFER_SIZE);
+        serializeJson(doc, output, CHAR_BUFFER_SIZE);
+        sendToSite(output);
+        free(output);
+      }
+    }
+    lastTouchedSensor = currTouchedSensor;
   }
 }
 
@@ -444,22 +521,6 @@ void checkForSlider()
 }
 
 /**
-   See if a tile was removed, if so store this information and report
-*/
-void checkForTileRemoval()
-{
-
-}
-
-/**
-   See if a tile was placed, if so act accordingly
-*/
-void checkForTilePlacement()
-{
-
-}
-
-/**
    See if a palette change
 */
 void checkForPaletteChange()
@@ -489,8 +550,6 @@ void checkForAnyUserInput()
   checkForButtonPress();
   checkForPaletteChange();
   checkForSlider();
-  checkForTileRemoval();
-  checkForTilePlacement();
 }
 
 /**
