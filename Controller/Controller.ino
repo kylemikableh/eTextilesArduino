@@ -46,13 +46,11 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 */
 #define ACTION "action"
 #define ACTION_BUTTON_PRESSED "buttonPressed"
-#define ACTION_TILE_REMOVED "tileRemoved"
-#define ACTION_TILE_PLACED "tilePlaced"
+#define ACTION_BUTTON_RELEASED "buttonReleased"
+//#define ACTION_TILE_REMOVED "tileRemoved"
+//#define ACTION_TILE_PLACED "tilePlaced"
 #define ACTION_SLIDER_MOVED "sliderMoved"
 #define ACTION_ID "ID"
-#define ACTION_ID_BUTTON "B"
-#define ACTION_ID_TILE "T"
-#define ACTION_ID_SLIDER "S"
 #define ACTION_TYPE "type"
 
 /**
@@ -78,8 +76,8 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
    Define slider information
 */
 
-#define SOFT_POT_PIN_1 A0 // Pin connected to softpot wiper
-#define SOFT_POT_PIN_2 A1 // Pin connected to softpot wiper
+#define SOFT_POT_PIN_1 A0 // Pin connected to slider1
+#define SOFT_POT_PIN_2 A1 // Pin connected to slider2
 
 
 cLEDMatrix<MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_TYPE> leds;
@@ -95,12 +93,14 @@ void setup()
 {
   initalizePins();
   setupLEDS();
-  while (!Serial) {
+  while (!Serial) 
+  {
     ; // Don't do anything unless Serial is active
   }
 
   Serial.begin(115200);
-  if (DEBUG) {
+  if (DEBUG) 
+  {
     sendToSite("{\"message\": \"Controller Paired.\"}");
   }
   Serial.flush();
@@ -110,7 +110,7 @@ void setup()
    */
   if (cap.begin(0x5A)) 
   {
-    sendToSite("MPR121 found!");
+    sendToSite("MPR121 touch sensor found!");
     foundTouchSensor = true;
   }
   else
@@ -313,18 +313,15 @@ void changeLEDS(DynamicJsonDocument json)
 */
 void processUpdate(DynamicJsonDocument json)
 {
-  sendToSite("Processing update. MEM SIZE of JSON:");
-  char sizeChar[sizeof(int)];
-  itoa(json.size(), sizeChar, 10); //10 is the base
-  sendToSite(sizeChar);
-
   const char* updateStr = json[UPDATE];
 
-  if (DEBUG) {
+  if (DEBUG) 
+  {
     sendToSite(updateStr);
   }
 
-  if (strcmp(updateStr, NULL_STRING) == 0) {
+  if (strcmp(updateStr, NULL_STRING) == 0) 
+  {
     return;
   }
   else if (strcmp(updateStr, UPDATE_LEDS) == 0)
@@ -346,24 +343,25 @@ void processUpdate(DynamicJsonDocument json)
 */
 void processAction(DynamicJsonDocument json)
 {
-  const char* action = json[ACTION];
-  if (DEBUG) {
-    sendToSite(action);
-  }
-
-  if (strcmp(action, NULL_STRING) == 0) {
-    return; //don't do anything if there was no action key
-  }
-  else if (strcmp(action, ACTION_BUTTON_PRESSED) == 0)
-  {
-
-  }
-  else if (strcmp(action, ACTION_TILE_REMOVED) == 0)
-  {
-
-  }
-
-  //Handle cases here
+//  const char* action = json[ACTION];
+//  if (DEBUG) 
+//  {
+//    sendToSite(action);
+//  }
+//
+//  if (strcmp(action, NULL_STRING) == 0) {
+//    return; //don't do anything if there was no action key
+//  }
+//  else if (strcmp(action, ACTION_BUTTON_PRESSED) == 0)
+//  {
+//
+//  }
+//  else if (strcmp(action, ACTION_TILE_REMOVED) == 0)
+//  {
+//
+//  }
+//
+//  //Handle cases here
 }
 
 /**
@@ -424,7 +422,9 @@ void checkForButtonPress()
   if(foundTouchSensor) //If we found the touch sensor we can procede!
   {
       //figure out which button is pressed
-    bool changeDetected = false;
+    bool touchDetected = false;
+    bool releaseDetected = false;
+    uint8_t buttonID = 0;
   
     /**
      * Check touch sensor
@@ -436,35 +436,44 @@ void checkForButtonPress()
       // it if *is* touched and *wasnt* touched before, alert!
       if ((currTouchedSensor & _BV(i)) && !(lastTouchedSensor & _BV(i)) ) 
       {
-        char touchID[sizeof(int)];
-        itoa(i, touchID, 10); //10 is the base
-        sendToSite("Touch was detected! Waiting on release of: ");
-        sendToSite(touchID);
+//        char touchID[sizeof(int)];
+//        itoa(i, touchID, 10); //10 is the base
+//        sendToSite("Touch was detected! Waiting on release of: ");
+//        sendToSite(touchID);
+        touchDetected = true;
+        buttonID = i;
       }
-      // if it *was* touched and now *isnt*, alert!
-      if (!(currTouchedSensor & _BV(i)) && (lastTouchedSensor & _BV(i)) ) 
+      else if (!(currTouchedSensor & _BV(i)) && (lastTouchedSensor & _BV(i)) ) 
       {
-        char touchID[sizeof(int)];
-        itoa(i, touchID, 10); //10 is the base
-        sendToSite("Release was detected! Waiting on release of: ");
-        sendToSite(touchID);
+//        char touchID[sizeof(int)];
+//        itoa(i, touchID, 10); //10 is the base
+//        sendToSite("Release was detected! Waiting on release of: ");
+//        sendToSite(touchID);
+        releaseDetected = true;
+        buttonID = i;
+      }
+
+      if(touchDetected || releaseDetected)
+      {
+        //This is for handling which page we are viewing
+        const int capacity = JSON_OBJECT_SIZE(6);
+        StaticJsonDocument<capacity> doc;
+        doc[ACTION_ID] = buttonID;
+        if(touchDetected)
+        {
+          doc[ACTION] = ACTION_BUTTON_PRESSED;
+        }
+        else if(releaseDetected)
+        {
+          doc[ACTION] = ACTION_BUTTON_RELEASED;
+        }
+        char* output = malloc(CHAR_BUFFER_SIZE);
+        serializeJson(doc, output, CHAR_BUFFER_SIZE);
+        sendToSite(output);
+        free(output);
       }
     }
     lastTouchedSensor = currTouchedSensor;
-//    Work on the JSON to send next
-//    if (changeDetected)
-//    {
-//      //This is for handling which page we are viewing
-//      char buttonID = 0; //Set this to button ID detected
-//      const int capacity = JSON_OBJECT_SIZE(6);
-//      StaticJsonDocument<capacity> doc;
-//      doc[ACTION] = ACTION_BUTTON_PRESSED;
-//      doc[ACTION_ID] = buttonID;
-//      char* output = malloc(CHAR_BUFFER_SIZE);
-//      serializeJson(doc, output, CHAR_BUFFER_SIZE);
-//      sendToSite(output);
-//      free(output);
-//    }
   }
 }
 
@@ -512,22 +521,6 @@ void checkForSlider()
 }
 
 /**
-   See if a tile was removed, if so store this information and report
-*/
-void checkForTileRemoval()
-{
-
-}
-
-/**
-   See if a tile was placed, if so act accordingly
-*/
-void checkForTilePlacement()
-{
-
-}
-
-/**
    See if a palette change
 */
 void checkForPaletteChange()
@@ -557,8 +550,6 @@ void checkForAnyUserInput()
   checkForButtonPress();
   checkForPaletteChange();
   checkForSlider();
-  checkForTileRemoval();
-  checkForTilePlacement();
 }
 
 /**
