@@ -34,12 +34,12 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 */
 
 #define DEBUG true // Enable or disable debug operation
-#define JSON_BUFFER_SIZE 128 // Size of JSON file in bytes
-#define CHAR_BUFFER_SIZE 128 // Size of CHAR* allocations in bytes
+#define JSON_BUFFER_SIZE 120 // Size of JSON file in bytes
+#define CHAR_BUFFER_SIZE 120 // Size of CHAR* allocations in bytes
 #define NULL_STRING "null" //String of null JSON might return
 #define START_TRANSMISSION_CHAR "#"
 #define END_TRANSMISSION_CHAR "$"
-#define LOWEST_SLIDER_VALUE 200 //Lowest value threshold for Slider values
+#define LOWEST_SLIDER_VALUE 0 //Lowest value threshold for Slider values
 
 /**
    Action types
@@ -47,8 +47,6 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 #define ACTION "action"
 #define ACTION_BUTTON_PRESSED "buttonPressed"
 #define ACTION_BUTTON_RELEASED "buttonReleased"
-//#define ACTION_TILE_REMOVED "tileRemoved"
-//#define ACTION_TILE_PLACED "tilePlaced"
 #define ACTION_SLIDER_MOVED "sliderMoved"
 #define ACTION_ID "ID"
 #define ACTION_TYPE "type"
@@ -62,22 +60,23 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 #define UPDATE_LEDS_STYLE "style"
 #define UPDATE_LEDS_STYLE_FULL "full"
 #define UPDATE_LEDS_STYLE_BAR "bar"
-#define UPDATE_LEDS_STYLE_DIAGONAL "diagonal"
+#define UPDATE_LEDS_STYLE_DIAGONAL "dia"
 #define UPDATE_LEDS_STYLE_ISO "iso"
 #define UPDATE_LEDS_STYLE_DRUNK "drunk"
-#define UPDATE_LEDS_FIRST_COLOR_R "first_color_R"
-#define UPDATE_LEDS_FIRST_COLOR_G "first_color_G"
-#define UPDATE_LEDS_FIRST_COLOR_B "first_color_B"
-#define UPDATE_LEDS_SECOND_COLOR_R "second_color_R"
-#define UPDATE_LEDS_SECOND_COLOR_G "second_color_G"
-#define UPDATE_LEDS_SECOND_COLOR_B "second_color_B"
+#define UPDATE_LEDS_FIRST_COLOR_R "f_c_R"
+#define UPDATE_LEDS_FIRST_COLOR_G "f_c_G"
+#define UPDATE_LEDS_FIRST_COLOR_B "f_c_B"
+#define UPDATE_LEDS_SECOND_COLOR_R "s_c_R"
+#define UPDATE_LEDS_SECOND_COLOR_G "s_c_G"
+#define UPDATE_LEDS_SECOND_COLOR_B "s_c_B"
 
 /**
    Define slider information
 */
 
-#define SOFT_POT_PIN_1 A0 // Pin connected to slider1
-#define SOFT_POT_PIN_2 A1 // Pin connected to slider2
+#define SOFT_POT_PIN A0 // Pin connected to slider
+#define SLIDER_PAUSE_INTERVAL 100
+#define DIFFERENCE_DETECT_INTERVAL 10 //At what point would we call a change in slider value a change?
 
 
 cLEDMatrix<MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_TYPE> leds;
@@ -85,6 +84,8 @@ Adafruit_MPR121 cap = Adafruit_MPR121();
 boolean foundTouchSensor = false; //Did we find the touch sensor? If not don't try!
 uint16_t lastTouchedSensor = 0; //holding values of buttons
 uint16_t currTouchedSensor = 0; //holding values of buttons
+unsigned long lastSliderUpdateTime = 0;
+unsigned int lastSliderValue = 0;
 
 /**
    Arduino setup function on powerup.
@@ -131,7 +132,7 @@ void setupLEDS()
 */
 void initalizePins()
 {
-  pinMode(SOFT_POT_PIN_1, INPUT);
+  pinMode(SOFT_POT_PIN, INPUT);
 }
 
 /**
@@ -384,7 +385,6 @@ DynamicJsonDocument getJsonFromSite()
   char* error = deserializeJson(json, jsonRecieved).c_str();
   if (error) //If deserializeJson failed, report this
   {
-    sendToSite("{\"message\": \"deserialize error?\"}");
     sendToSite(error);
   }
   return json;
@@ -397,11 +397,9 @@ void serialAvailable()
 {
   if (Serial && Serial.available())
   {
-    sendToSite("Made it here");
     DynamicJsonDocument json = getJsonFromSite(); // Let's get the sent JSON
     if (!json.isNull())
     {
-      sendToSite("Was not null. Test char size: 1234556778991234456678899012344546547i5i8");
       processAction(json);
       processUpdate(json);
     }
@@ -496,28 +494,27 @@ void writeSliderInfo(char *type, int value)
 void checkForSlider()
 {
   // Read in the soft pot's ADC value
-  int softPotADC1 = analogRead(SOFT_POT_PIN_1);
+  int softPotADC = analogRead(SOFT_POT_PIN);
   // Map the 0-1023 value to 0-365
-  int softPotPosition1 = map(softPotADC1, 0, 1023, 1, 365);
-
-  // Read in the soft pot's ADC value
-  int softPotADC2 = analogRead(SOFT_POT_PIN_2);
-  // Map the 0-1023 value to 0-255
-  int softPotPosition2 = map(softPotADC2, 0, 1023, 1, 365);
-  if (softPotPosition1 != NULL && softPotPosition1 >= LOWEST_SLIDER_VALUE) //If it is not zero do something
+  int softPotPosition = map(softPotADC, 0, 1023, 1, 365);
+  if (softPotPosition != NULL && softPotPosition >= LOWEST_SLIDER_VALUE) //If it is not zero do something
   {
-    writeSliderInfo("S0", softPotPosition1);
+    unsigned long currentTime = millis();
+    if (currentTime - lastSliderUpdateTime > SLIDER_PAUSE_INTERVAL)
+    {
+      lastSliderUpdateTime = currentTime;
+//      char touchID[sizeof(unsigned long)];
+//      ltoa(currentTime, touchID, 10); //10 is the base
+//      sendToSite("Current time: ");
+//      sendToSite(touchID);
+      if(abs(softPotPosition - lastSliderValue) > DIFFERENCE_DETECT_INTERVAL)
+      {
+        //A (large) change was detected!
+        writeSliderInfo("S0", softPotPosition);
+      }
+      lastSliderValue = softPotPosition;
+    }
   }
-  //  if(softPotPosition2 != NULL && softPotPosition2 >= LOWEST_SLIDER_VALUE) //If it is not zero do something
-  //  {
-  //    writeSliderInfo("S1", softPotPosition2);
-  //  }
-  //For demonstration purposes
-  //  for(int i = 0; i < 355; i++)
-  //  {
-  //    writeSliderInfo("S1", i);
-  //    delay(100);
-  //  }
 }
 
 /**
