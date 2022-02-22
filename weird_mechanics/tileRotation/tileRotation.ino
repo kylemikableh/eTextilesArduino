@@ -20,17 +20,17 @@ bool determine_orientation = false;
 
 void setup()
 {
-//  //=== ATTACH INTERRUPT TO CHECK TILE ORIENTATION EVERY SO OFTEN
-//  // generate a 'TIMER0_COMPA' interrupt whenever the counter value passes 0xAF
-//  OCR0A = 0xFA;
-//  TIMSK0 |= _BV(OCIE0A);
+  //=== ATTACH INTERRUPT TO CHECK TILE ORIENTATION EVERY SO OFTEN
+  // generate a 'TIMER0_COMPA' interrupt whenever the counter value passes 0xAF
+  OCR0A = 0xAF;
+  TIMSK0 |= _BV(OCIE0A);
 }
 
-//// Interrupt is called once a millisecond,
-//SIGNAL(TIMER0_COMPA_vect)
-//{
-//  determine_orientation = true;
-//}
+// Interrupt is called once a millisecond,
+SIGNAL(TIMER0_COMPA_vect)
+{
+  determine_orientation = true;
+}
 
 int tile_read(int left, int right) {
   int i = 0;
