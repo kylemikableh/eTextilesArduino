@@ -34,8 +34,10 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 */
 
 #define DEBUG true // Enable or disable debug operation
+#define SERIAL_SPEED 115200
 #define JSON_BUFFER_SIZE 120 // Size of JSON file in bytes
 #define CHAR_BUFFER_SIZE 120 // Size of CHAR* allocations in bytes
+#define JSON_OBJ_CAPACITY JSON_OBJECT_SIZE(6) // JSON Object sizes for sending
 #define NULL_STRING "null" //String of null JSON might return
 #define START_TRANSMISSION_CHAR "#"
 #define END_TRANSMISSION_CHAR "$"
@@ -76,7 +78,7 @@ WebUSB WebUSBSerial(1 /* https:// */, "sever.kylem.org/controller/");
 
 #define SOFT_POT_PIN A0 // Pin connected to slider
 #define SLIDER_PAUSE_INTERVAL 100
-#define DIFFERENCE_DETECT_INTERVAL 10 //At what point would we call a change in slider value a change?
+#define DIFFERENCE_DETECT_INTERVAL 3 //At what point would we call a change in slider value a change?
 
 
 cLEDMatrix<MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_TYPE> leds;
@@ -84,34 +86,34 @@ Adafruit_MPR121 cap = Adafruit_MPR121();
 boolean foundTouchSensor = false; //Did we find the touch sensor? If not don't try!
 uint16_t lastTouchedSensor = 0; //holding values of buttons
 uint16_t currTouchedSensor = 0; //holding values of buttons
-unsigned long lastSliderUpdateTime = 0;
-unsigned int lastSliderValue = 0;
+unsigned long lastSliderUpdateTime = 0; // Hold last EPOCH time the sider was updated
+unsigned int lastSliderValue = 0; // Hold the last value the slider read
+
+// Hold onto the color values for the first color LED (0-355)
+unsigned int firstColorG = 0;
+unsigned int firstColorR = 0;
+unsigned int firstColorB = 0;
+
+// Hold onto the color values for the second color LED (0-355)
+unsigned int secondColorG = 0;
+unsigned int secondColorR = 0;
+unsigned int secondColorB = 0;
 
 /**
    Arduino setup function on powerup.
 */
 void setup()
 {
-  initalizePins();
-  setupLEDS();
-  while (!Serial) 
-  {
-    ; // Don't do anything unless Serial is active
-  }
-
-  Serial.begin(115200);
-  if (DEBUG) 
-  {
-    sendToSite("{\"message\": \"Controller Paired.\"}");
-  }
+  initalizePins(); // Initalize the pins for reading data
+  setupLEDS(); // Setup the LEDS for use
+  while (!Serial) { ; } // Don't do anything unless Serial is active
+  Serial.begin(SERIAL_SPEED);
+  if (DEBUG) { sendToSite("{\"message\": \"Controller Paired.\"}"); }
   Serial.flush();
 
-  /**
-   * Check for the Capacitive sensor
-   */
+  // Check for the Capacitive sensor
   if (cap.begin(0x5A)) 
   {
-    sendToSite("MPR121 touch sensor found!");
     foundTouchSensor = true;
   }
   else
@@ -120,9 +122,12 @@ void setup()
   }
 }
 
+/**
+ * Set the LED parameters and reset the display when connecting
+ */
 void setupLEDS()
 {
-  FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds[0], leds.Size());
+  FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds[0], leds.Size()); // Define the LEDS 
   FastLED.clear();
   FastLED.show();
 }
@@ -132,7 +137,7 @@ void setupLEDS()
 */
 void initalizePins()
 {
-  pinMode(SOFT_POT_PIN, INPUT);
+  pinMode(SOFT_POT_PIN, INPUT); // Set the Slider analogue read pin
 }
 
 /**
@@ -141,42 +146,47 @@ void initalizePins()
 */
 void sendToSite(char* data)
 {
-  const char* startChar = START_TRANSMISSION_CHAR;
-  const char* endChar = END_TRANSMISSION_CHAR;
-  const char* nullTerminator = "\0";
-  char* toSend = malloc(2 + CHAR_BUFFER_SIZE); //Allocate memory for new string. Size probably needs to change
-  strcpy(toSend, startChar);
-  strcat(toSend, data);
-  strcat(toSend, endChar);
-  strcat(toSend, nullTerminator);
-  Serial.write(toSend);
-  Serial.flush();
-  free(toSend); //Don't want no memory leaks!
+  const char* startChar = START_TRANSMISSION_CHAR; // Define the start char
+  const char* endChar = END_TRANSMISSION_CHAR; // Define the end char
+  const char* nullTerminator = "\0"; // Define the nullTerminator for ending
+  char* toSend = malloc(2 + CHAR_BUFFER_SIZE); // Allocate memory for new string. Size probably needs to change
+  strcpy(toSend, startChar); // Add the start char to char buffer
+  strcat(toSend, data); // Add the data to the char buffer
+  strcat(toSend, endChar); // Add the end char to the char buffer
+  strcat(toSend, nullTerminator); // Add the null terminator to the char buffer
+  Serial.write(toSend); // Send the data
+  Serial.flush(); // Reset the serial 
+  free(toSend); // Don't want no memory leaks! Free the memory of the char buffer
 }
 
-unsigned int firstColorG = 0;
-unsigned int firstColorR = 0;
-unsigned int firstColorB = 0;
-
-unsigned int secondColorG = 0;
-unsigned int secondColorR = 0;
-unsigned int secondColorB = 0;
+/**
+ * Send JSON object to site, handling allocation and freeing of SRAM
+ */
+void allocateAndSend(StaticJsonDocument<JSON_OBJ_CAPACITY> doc)
+{
+  char* output = malloc(CHAR_BUFFER_SIZE); // Allocate char buffer for data to send
+  serializeJson(doc, output, CHAR_BUFFER_SIZE); // Write the serialized Json data to the data buffer
+  sendToSite(output); // Send the data to the site
+  free(output); // No memory leaks! Free output buffer
+}
 
 /**
    LED Controller
 */
 void changeLEDS(DynamicJsonDocument json)
 {
-  FastLED.clear();
-  const char* values = json[UPDATE_LEDS_VALUES];
-  const char* style = json[UPDATE_LEDS_STYLE];
+  FastLED.clear(); //Reset the LEDs
+  const char* values = json[UPDATE_LEDS_VALUES]; // Get pointer to value char* array
+  const char* style = json[UPDATE_LEDS_STYLE]; // Get pointer to style char* array
 
+  // Check to see if we are updating first or second color
   if(json.containsKey(UPDATE_LEDS_FIRST_COLOR_R))
   {
     firstColorG = json[UPDATE_LEDS_FIRST_COLOR_R];
     firstColorR = json[UPDATE_LEDS_FIRST_COLOR_G];
     firstColorB = json[UPDATE_LEDS_FIRST_COLOR_B];
   }
+  // Check to see if we are updating first or second color
   if(json.containsKey(UPDATE_LEDS_SECOND_COLOR_R))
   {
     secondColorG = json[UPDATE_LEDS_SECOND_COLOR_R];
@@ -184,12 +194,12 @@ void changeLEDS(DynamicJsonDocument json)
     secondColorB = json[UPDATE_LEDS_SECOND_COLOR_B];
   }
 
-  char sizeChar[sizeof(unsigned int)];
-  itoa(secondColorR, sizeChar, 10); //the 10 stands for base 10
-  sendToSite("This is the LED value: ");
-  sendToSite(sizeChar); //Make sure we are getting what we want
+//  char sizeChar[sizeof(unsigned int)]; 
+//  itoa(secondColorR, sizeChar, 10); //the 10 stands for base 10
+//  sendToSite("This is the LED value: ");
+//  sendToSite(sizeChar); //Make sure we are getting what we want
 
-  if (strcmp(style, UPDATE_LEDS_STYLE_BAR) == 0)
+  if (strcmp(style, UPDATE_LEDS_STYLE_BAR) == 0) // Is the style BAR?
   {
     sendToSite("Style of BAR");
     for (int i = 0; i < MATRIX_WIDTH; i++)
@@ -207,7 +217,7 @@ void changeLEDS(DynamicJsonDocument json)
       }
     }
   }
-  else if (strcmp(style, UPDATE_LEDS_STYLE_FULL) == 0)
+  else if (strcmp(style, UPDATE_LEDS_STYLE_FULL) == 0) // Is the style FULL/SQUARE?
   {
     sendToSite("Style of FULL");
     for (int i = 0; i < MATRIX_WIDTH; i++)
@@ -219,7 +229,7 @@ void changeLEDS(DynamicJsonDocument json)
     }
   }
 
-  else if (strcmp(style, UPDATE_LEDS_STYLE_DIAGONAL) == 0)
+  else if (strcmp(style, UPDATE_LEDS_STYLE_DIAGONAL) == 0) // Is the style DIAGONAL?
   {
     sendToSite("Style of DIAG");
     for (int i = 0; i < MATRIX_WIDTH; i++) {
@@ -233,7 +243,7 @@ void changeLEDS(DynamicJsonDocument json)
       }
     }
   }
-  else if (strcmp(style, UPDATE_LEDS_STYLE_DRUNK) == 0)
+  else if (strcmp(style, UPDATE_LEDS_STYLE_DRUNK) == 0) // Is the style DRUNKARDS?
   {
     for (int i = 0; i < 6; i++)
     {
@@ -258,7 +268,7 @@ void changeLEDS(DynamicJsonDocument json)
       leds(i, 6) = CRGB(secondColorR, secondColorG, secondColorB);
       }
   }
-  else if (strcmp(style, UPDATE_LEDS_STYLE_ISO) == 0)
+  else if (strcmp(style, UPDATE_LEDS_STYLE_ISO) == 0) // Is the style ISOCELES TRIANGLE?
   {
     //Isoceles
     for (int i = 0; i < MATRIX_WIDTH; i++)
@@ -314,18 +324,19 @@ void changeLEDS(DynamicJsonDocument json)
 */
 void processUpdate(DynamicJsonDocument json)
 {
-  const char* updateStr = json[UPDATE];
+  const char* updateStr = json[UPDATE]; // Get pointer to the update char* array
 
   if (DEBUG) 
   {
     sendToSite(updateStr);
   }
 
+  // If the update is null don't do anything
   if (strcmp(updateStr, NULL_STRING) == 0) 
   {
     return;
   }
-  else if (strcmp(updateStr, UPDATE_LEDS) == 0)
+  else if (strcmp(updateStr, UPDATE_LEDS) == 0) // If the update is for LEDS handle it
   {
     //Handle LED update
     changeLEDS(json);
@@ -339,41 +350,14 @@ void processUpdate(DynamicJsonDocument json)
 }
 
 /**
-   Handle the action passed
-   @args json JSON from site
-*/
-void processAction(DynamicJsonDocument json)
-{
-//  const char* action = json[ACTION];
-//  if (DEBUG) 
-//  {
-//    sendToSite(action);
-//  }
-//
-//  if (strcmp(action, NULL_STRING) == 0) {
-//    return; //don't do anything if there was no action key
-//  }
-//  else if (strcmp(action, ACTION_BUTTON_PRESSED) == 0)
-//  {
-//
-//  }
-//  else if (strcmp(action, ACTION_TILE_REMOVED) == 0)
-//  {
-//
-//  }
-//
-//  //Handle cases here
-}
-
-/**
    Get the sent JSON from the site and convert it to JSON type
    @args
    @returns DynamicJsonDocument json
 */
 DynamicJsonDocument getJsonFromSite()
 {
-  String jsonRecieved = Serial.readString();
-  char jsonRecievedBuff[JSON_BUFFER_SIZE];
+  String jsonRecieved = Serial.readString(); // Get the string sent from site (Had to be String data type, tried to avoid it but this seems to be the only way)
+  char jsonRecievedBuff[JSON_BUFFER_SIZE]; // Hold the char* array of the JSON recieved
   jsonRecieved.toCharArray(jsonRecievedBuff, jsonRecieved.length() + 3); //the 3 is for the null termininator
 
   if (DEBUG)
@@ -381,17 +365,17 @@ DynamicJsonDocument getJsonFromSite()
     sendToSite(jsonRecievedBuff);
   }
 
-  DynamicJsonDocument json(JSON_BUFFER_SIZE);
-  char* error = deserializeJson(json, jsonRecieved).c_str();
+  DynamicJsonDocument json(JSON_BUFFER_SIZE); // This is the JSON document we recieved that will be passed around
+  char* error = deserializeJson(json, jsonRecieved).c_str(); // Deserialize the json and read the error char* array if it exists
   if (error) //If deserializeJson failed, report this
   {
     sendToSite(error);
   }
-  return json;
+  return json; // Return the JSON
 }
 
 /**
-
+* Loop when serial was found, and check for user inputs
 */
 void serialAvailable()
 {
@@ -400,7 +384,6 @@ void serialAvailable()
     DynamicJsonDocument json = getJsonFromSite(); // Let's get the sent JSON
     if (!json.isNull())
     {
-      processAction(json);
       processUpdate(json);
     }
     else
@@ -424,11 +407,9 @@ void checkForButtonPress()
     bool releaseDetected = false;
     uint8_t buttonID = 0;
   
-    /**
-     * Check touch sensor
-     */
-    currTouchedSensor = cap.touched();
-    
+    currTouchedSensor = cap.touched(); // Check touch sensor
+
+    // Loop over all buttons to see which one was pressed
     for (uint8_t i=0; i<TOTAL_BUTTONS; i++) 
     {
       // it if *is* touched and *wasnt* touched before, alert!
@@ -451,13 +432,13 @@ void checkForButtonPress()
         buttonID = i;
       }
 
+      //If a touch or release was found we need to do an action
       if(touchDetected || releaseDetected)
       {
         //This is for handling which page we are viewing
-        const int capacity = JSON_OBJECT_SIZE(6);
-        StaticJsonDocument<capacity> doc;
+        StaticJsonDocument<JSON_OBJ_CAPACITY> doc;
         doc[ACTION_ID] = buttonID;
-        if(touchDetected)
+        if(touchDetected) // Which action type was this?
         {
           doc[ACTION] = ACTION_BUTTON_PRESSED;
         }
@@ -465,27 +446,23 @@ void checkForButtonPress()
         {
           doc[ACTION] = ACTION_BUTTON_RELEASED;
         }
-        char* output = malloc(CHAR_BUFFER_SIZE);
-        serializeJson(doc, output, CHAR_BUFFER_SIZE);
-        sendToSite(output);
-        free(output);
+        allocateAndSend(doc); // Send this new found information over to the site
       }
     }
-    lastTouchedSensor = currTouchedSensor;
+    lastTouchedSensor = currTouchedSensor; // Change which sensor was last touched
   }
 }
 
+/**
+ * Send the slider action to the site
+ */
 void writeSliderInfo(char *type, int value)
 {
-  const int capacity = JSON_OBJECT_SIZE(6);
-  StaticJsonDocument<capacity> doc;
-  doc[ACTION] = ACTION_SLIDER_MOVED;
-  doc[ACTION_ID] = value;
-  doc[ACTION_TYPE] = type;
-  char* output = malloc(CHAR_BUFFER_SIZE);
-  serializeJson(doc, output, CHAR_BUFFER_SIZE);
-  sendToSite(output);
-  free(output);
+  StaticJsonDocument<JSON_OBJ_CAPACITY> doc; // Create the Static JSON Document with allocation size
+  doc[ACTION] = ACTION_SLIDER_MOVED; // Set the action to Slider
+  doc[ACTION_ID] = value; // Set the ID to the read Analogue value
+  doc[ACTION_TYPE] = type; // Set the type to the type
+  allocateAndSend(doc); // Send this over to the site
 }
 
 /**
@@ -493,48 +470,41 @@ void writeSliderInfo(char *type, int value)
 */
 void checkForSlider()
 {
-  // Read in the soft pot's ADC value
-  int softPotADC = analogRead(SOFT_POT_PIN);
-  // Map the 0-1023 value to 0-365
-  int softPotPosition = map(softPotADC, 0, 1023, 1, 365);
+  int softPotADC = analogRead(SOFT_POT_PIN); // Read the value from the slider
+  int softPotPosition = map(softPotADC, 0, 1023, 1, 365); // Map the 0-1023 value to 0-365
+  
   if (softPotPosition != NULL && softPotPosition >= LOWEST_SLIDER_VALUE) //If it is not zero do something
   {
     unsigned long currentTime = millis();
     if (currentTime - lastSliderUpdateTime > SLIDER_PAUSE_INTERVAL)
     {
       lastSliderUpdateTime = currentTime;
-//      char touchID[sizeof(unsigned long)];
-//      ltoa(currentTime, touchID, 10); //10 is the base
-//      sendToSite("Current time: ");
-//      sendToSite(touchID);
-      if(abs(softPotPosition - lastSliderValue) > DIFFERENCE_DETECT_INTERVAL)
+      int difBeforeAbs = softPotPosition - lastSliderValue;
+      int absOfDif = abs(difBeforeAbs);
+      if(absOfDif > DIFFERENCE_DETECT_INTERVAL) // If the time difference is greater than the amount to detect
       {
         //A (large) change was detected!
         writeSliderInfo("S0", softPotPosition);
       }
-      lastSliderValue = softPotPosition;
+      lastSliderValue = softPotPosition; // Set the last slider value to the current value
     }
   }
 }
 
 /**
-   See if a palette change
+   See if a palette change (Might need to remove and consolidate)
 */
 void checkForPaletteChange()
 {
   //Do the checking here, check with teammates, button 0-5 is the palette buttons
-  bool changeDetected = false;
+  bool changeDetected = false; // Was there a change detected?
   if (changeDetected)
   {
     char buttonID = 0; //Set this to button ID detected
-    const int capacity = JSON_OBJECT_SIZE(6);
-    StaticJsonDocument<capacity> doc;
+    StaticJsonDocument<JSON_OBJ_CAPACITY> doc;
     doc[ACTION] = ACTION_BUTTON_PRESSED;
     doc[ACTION_ID] = buttonID;
-    char* output = malloc(CHAR_BUFFER_SIZE);
-    serializeJson(doc, output, CHAR_BUFFER_SIZE);
-    sendToSite(output);
-    free(output);
+    allocateAndSend(doc);
   }
 }
 
