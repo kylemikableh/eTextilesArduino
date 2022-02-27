@@ -13,7 +13,7 @@ char dataOut[4];
 void setup() {
   // put yoursetup code here, to run once:
   pinMode(data, INPUT);
-  
+
   pinMode(eastSelect, OUTPUT);
   pinMode(eastEnable, OUTPUT);
   pinMode(topSelect, OUTPUT);
@@ -24,85 +24,98 @@ void setup() {
   Serial.begin(9600);
 }
 
-void loop() {
-  
-  //for (int i = 0; i < 4; i++) { //do this 4 times (for each magnet)
+void readSpecTile(int in [3]){
+//input 4 bit number
+//output status of thatta tile.
+}
 
-    //EAST TOP
-    mux_setup(1, 1, 1, 1);  //CONTROLLS WHAT QUADRANT YOU'RE GETTING DATA FOR
-    dataOut[0] = digitalRead(data);//tile 1
+void loop(){
+  //write to pins 2-5. target: 0000, then 0101
+  digitalWrite(2,0);
+  digitalWrite(3,0);
+  digitalWrite(4,0);
+  digitalWrite(5,0);
+  //read data on a5
+  Serial.println(!digitalRead(A5));
 
-     mux_setup(1, 1, 0, 0);
-    dataOut[1] = digitalRead(data);//tile 2
+}
 
-    mux_setup(1, 1, 1, 0);
-    dataOut[2] = digitalRead(data);//tile 3
+void old_loop() {
 
-    mux_setup(1, 1, 0, 1);
-    dataOut[3] = digitalRead(data);//tile 4
-    printTile();
+  //EAST TOP
+  mux_setup(1, 1, 1, 1);           //CONTROLLS WHAT QUADRANT YOU'RE GETTING DATA FOR
+  dataOut[0] = digitalRead(data);  //tile 1
 
+  mux_setup(1, 1, 0, 0);
+  dataOut[1] = digitalRead(data);  //tile 2
 
+  mux_setup(1, 1, 1, 0);
+  dataOut[2] = digitalRead(data);  //tile 3
 
-    //WEST TOP
-    mux_setup(0, 1, 1, 1);  //CONTROLLS WHAT QUADRANT YOU'RE GETTING DATA FOR
-    dataOut[0] = digitalRead(data);//tile 1
-
-     mux_setup(0, 1, 0, 0);
-    dataOut[1] = digitalRead(data);//tile 2
-
-    mux_setup(0, 1, 1, 0);
-    dataOut[2] = digitalRead(data);//tile 3
-
-    mux_setup(0, 1, 0, 1);
-    dataOut[3] = digitalRead(data);//tile 4
-    printTile();
+  mux_setup(1, 1, 0, 1);
+  dataOut[3] = digitalRead(data);  //tile 4
+  printTile();
 
 
 
+  // //WEST TOP
+  // mux_setup(0, 1, 1, 1);           //CONTROLLS WHAT QUADRANT YOU'RE GETTING DATA FOR
+  // dataOut[0] = digitalRead(data);  //tile 1
 
-    //EAST BOTTOM
-    mux_setup(1, 0, 1, 1);  //CONTROLLS WHAT QUADRANT YOU'RE GETTING DATA FOR
-    dataOut[0] = digitalRead(data);//tile 1
+  // mux_setup(0, 1, 0, 0);
+  // dataOut[1] = digitalRead(data);  //tile 2
 
-     mux_setup(1, 0, 0, 0);
-    dataOut[1] = digitalRead(data);//tile 2
+  // mux_setup(0, 1, 1, 0);
+  // dataOut[2] = digitalRead(data);  //tile 3
 
-    mux_setup(1, 0, 1, 0);
-    dataOut[2] = digitalRead(data);//tile 3
-
-    mux_setup(1, 0, 0, 1);
-    dataOut[3] = digitalRead(data);//tile 4
-    printTile();
+  // mux_setup(0, 1, 0, 1);
+  // dataOut[3] = digitalRead(data);  //tile 4
+  // printTile();
 
 
 
 
+  // //EAST BOTTOM
+  // mux_setup(1, 0, 1, 1);           //CONTROLLS WHAT QUADRANT YOU'RE GETTING DATA FOR
+  // dataOut[0] = digitalRead(data);  //tile 1
 
-    //WEST BOTTOM
-    mux_setup(0, 0, 1, 1);  //CONTROLLS WHAT QUADRANT YOU'RE GETTING DATA FOR
-    dataOut[0] = digitalRead(data);//tile 1
+  // mux_setup(1, 0, 0, 0);
+  // dataOut[1] = digitalRead(data);  //tile 2
 
-     mux_setup(0, 0, 0, 0);
-    dataOut[1] = digitalRead(data);//tile 2
+  // mux_setup(1, 0, 1, 0);
+  // dataOut[2] = digitalRead(data);  //tile 3
 
-    mux_setup(0, 0, 1, 0);
-    dataOut[2] = digitalRead(data);//tile 3
+  // mux_setup(1, 0, 0, 1);
+  // dataOut[3] = digitalRead(data);  //tile 4
+  // printTile();
 
-    mux_setup(0, 0, 0, 1);
-    dataOut[3] = digitalRead(data);//tile 4
-    printTile();
-  //}
+
+
+
+
+  // //WEST BOTTOM
+  // mux_setup(0, 0, 1, 1);           //CONTROLLS WHAT QUADRANT YOU'RE GETTING DATA FOR
+  // dataOut[0] = digitalRead(data);  //tile 1
+
+  // mux_setup(0, 0, 0, 0);
+  // dataOut[1] = digitalRead(data);  //tile 2
+
+  // mux_setup(0, 0, 1, 0);
+  // dataOut[2] = digitalRead(data);  //tile 3
+
+  // mux_setup(0, 0, 0, 1);
+  // dataOut[3] = digitalRead(data);  //tile 4
+  // printTile();
 
   Serial.println("=====");
 
   delay(250);
 }
 
-void printTile(){
+void printTile() {
   //PRINT DATA: FOR DEBUG
   char buf[40], *pos = buf;
-    for (int i = 0 ; i <= 3 ; i++) {
+  for (int i = 0; i <= 3; i++) {
     if (i) {
       pos += sprintf(pos, ", ");
     }
