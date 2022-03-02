@@ -206,14 +206,14 @@ void changeLEDS(DynamicJsonDocument json)
     {
       for (int j = 0; j < 4; j++)
       {
-        leds(i, j) = CRGB(firstColorR, firstColorG, firstColorB);
+        leds(i, j) = CRGB(secondColorR, secondColorG, secondColorB);
       }
     }
     for (int i = 0; i < MATRIX_WIDTH; i++)
     {
       for (int j = 4; j < 8; j++)
       {
-        leds(i, j) = CRGB(secondColorR, secondColorG, secondColorB);
+        leds(i, j) = CRGB(firstColorR, firstColorG, firstColorB);
       }
     }
   }
@@ -233,13 +233,13 @@ void changeLEDS(DynamicJsonDocument json)
   {
     sendToSite("Style of DIAG");
     for (int i = 0; i < MATRIX_WIDTH; i++) {
-      for (int j = 0; j < i; j++) {
-        leds(i, j) = CRGB(firstColorR, firstColorG, firstColorB);
+      for (int j = 0; j < 7 - i; j++) {
+        leds(i, j) = CRGB(secondColorR, secondColorG, secondColorB);
       }
     }
-    for (int i = 0; i < MATRIX_WIDTH - 1; i++) {
-      for (int j = i + 1; j < 8; j++) {
-        leds(i, j) = CRGB(secondColorR, secondColorG, secondColorB);
+    for (int i = 0; i < MATRIX_WIDTH; i++) {
+      for (int j = 8 - i; j < 8; j++) {
+        leds(i, j) = CRGB(firstColorR, firstColorG, firstColorB);
       }
     }
   }
